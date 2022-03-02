@@ -1,16 +1,17 @@
 import { Navbar } from './components';
 import { About, Skills, Work, Footer, Header, Testimonials } from './container'
 
+import "./App.scss";
+
 const App = () => {
   return (
-    <div className="App">
+    <div className="app">
       <Navbar />
       <Header />
-      <App />
+      <About />
+      <Work />
       <Skills />
       <Testimonials />
-      <Work />
-      <About />
       <Footer />
     </div>
   );
