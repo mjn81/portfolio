@@ -12,8 +12,6 @@ import BlogSection from "@/components/blog-section"
 import Contact from "@/components/contact"
 import Footer from "@/components/footer"
 import LoadingScreen from "@/components/loading-screen"
-import ScrollToTop from "@/components/scroll-to-top"
-import ScrollProgress from "@/components/scroll-progress"
 import ScrollReveal from "@/components/scroll-reveal"
 
 // Section wrapper component to handle alternating backgrounds

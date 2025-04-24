@@ -28,23 +28,28 @@ export default function AdminLogin() {
     // This is a simple mock authentication
     try {
       // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const response = await fetch("/api/auth", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email: username, password }),
+      });
 
-      if (username === "admin" && password === "password") {
-        // Set a session cookie or localStorage token
-        localStorage.setItem("admin_authenticated", "true")
+      if (!response.ok) {
         toast({
-          title: "Login successful",
-          description: "Welcome to the admin dashboard",
-        })
-        router.push("/admin")
+					title: 'Login failed',
+					description: 'Invalid username or password',
+					variant: 'destructive',
+				});
       } else {
         toast({
-          title: "Login failed",
-          description: "Invalid username or password",
-          variant: "destructive",
-        })
-      }
+					title: 'Login successful',
+					description: 'Welcome to the admin dashboard',
+				});
+				router.push('/admin');
+      }    
+      
     } catch (error) {
       toast({
         title: "Login error",
@@ -89,7 +94,6 @@ export default function AdminLogin() {
                     required
                   />
                 </div>
-                <p className="text-xs text-muted-foreground">Hint: Username is "admin"</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
@@ -119,7 +123,6 @@ export default function AdminLogin() {
                     <span className="sr-only">{showPassword ? "Hide password" : "Show password"}</span>
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">Hint: Password is "password"</p>
               </div>
             </CardContent>
             <CardFooter>

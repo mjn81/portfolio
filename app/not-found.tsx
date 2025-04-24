@@ -11,51 +11,51 @@ import { Caveat } from "next/font/google"
 
 const caveat = Caveat({ subsets: ["latin"] })
 
+ const generateCodeLines = () => {
+		const lines = [];
+		const codeSnippets = [
+			'function findPage() {',
+			'  try {',
+			"    const page = await fetch('/page');",
+			"    if (!page.ok) throw new Error('404');",
+			'    return page.data;',
+			'  } catch (error) {',
+			"    console.error('Page not found');",
+			'    return null;',
+			'  }',
+			'}',
+			'const router = createRouter();',
+			"router.get('/missing-page', () => {",
+			'  return new Response(null, { status: 404 });',
+			'});',
+			'export default function Page() {',
+			"  // This page doesn't exist",
+			'  return <div>Missing Content</div>;',
+			'}',
+			'class PageNotFoundError extends Error {',
+			'  constructor() {',
+			"    super('The requested page was not found');",
+			"    this.name = '404Error';",
+			'    this.status = 404;',
+			'  }',
+			'}',
+		];
+
+		// Generate 30 lines of code by randomly selecting from snippets
+		for (let i = 0; i < 30; i++) {
+			const randomIndex = Math.floor(Math.random() * codeSnippets.length);
+			lines.push(codeSnippets[randomIndex]);
+		}
+
+		return lines;
+ };
+
 export default function NotFound() {
   const [isGlitching, setIsGlitching] = useState(false)
   const [codeLines, setCodeLines] = useState<string[]>([])
 
   // Generate random code lines for the background
   useEffect(() => {
-    const generateCodeLines = () => {
-      const lines = []
-      const codeSnippets = [
-        "function findPage() {",
-        "  try {",
-        "    const page = await fetch('/page');",
-        "    if (!page.ok) throw new Error('404');",
-        "    return page.data;",
-        "  } catch (error) {",
-        "    console.error('Page not found');",
-        "    return null;",
-        "  }",
-        "}",
-        "const router = createRouter();",
-        "router.get('/missing-page', () => {",
-        "  return new Response(null, { status: 404 });",
-        "});",
-        "export default function Page() {",
-        "  // This page doesn't exist",
-        "  return <div>Missing Content</div>;",
-        "}",
-        "class PageNotFoundError extends Error {",
-        "  constructor() {",
-        "    super('The requested page was not found');",
-        "    this.name = '404Error';",
-        "    this.status = 404;",
-        "  }",
-        "}",
-      ]
-
-      // Generate 30 lines of code by randomly selecting from snippets
-      for (let i = 0; i < 30; i++) {
-        const randomIndex = Math.floor(Math.random() * codeSnippets.length)
-        lines.push(codeSnippets[randomIndex])
-      }
-
-      return lines
-    }
-
     setCodeLines(generateCodeLines())
   }, [])
 

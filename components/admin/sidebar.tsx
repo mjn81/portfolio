@@ -38,7 +38,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 
 export function AdminSidebar() {
   const pathname = usePathname()
-  const { logout } = useAuth()
+  const { logout, profile } = useAuth()
   const { theme, setTheme } = useTheme()
   const [isMounted, setIsMounted] = useState(false)
 
@@ -159,11 +159,15 @@ export function AdminSidebar() {
           <div className="flex items-center gap-2 overflow-hidden">
             <Avatar className="h-8 w-8 shrink-0">
               <AvatarImage src="/placeholder.svg?height=32&width=32" alt="Admin" />
-              <AvatarFallback>MN</AvatarFallback>
+              <AvatarFallback>{
+                profile?.name
+                  ? profile.name.charAt(0).toUpperCase()
+                  : "E"
+              }</AvatarFallback>
             </Avatar>
             <div className="overflow-hidden">
-              <p className="text-sm font-medium truncate">Mohammad Najafi</p>
-              <p className="text-xs text-muted-foreground truncate">Administrator</p>
+              <p className="text-sm font-medium truncate">{ profile?.name || "Error"}</p>
+              <p className="text-xs text-muted-foreground truncate">{ profile?.role || "Error"}</p>
             </div>
           </div>
           <TooltipProvider>

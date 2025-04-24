@@ -392,7 +392,7 @@ export default function UsersPage() {
                 </TabsList>
               </Tabs>
 
-              <Select value={activeTab} onValueChange={setActiveTab} className="lg:hidden">
+              <Select value={activeTab} onValueChange={setActiveTab}>
                 <SelectTrigger className="w-[120px]">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
