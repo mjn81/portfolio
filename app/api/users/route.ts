@@ -4,6 +4,7 @@ import { supabase } from '@/lib/db-client';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { cookies } from 'next/headers';
+import { TokenDto } from '@/types/user';
 
 export async function POST(request: NextRequest) {
   const token = (await cookies()).get('token')?.value;
@@ -13,11 +14,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
-      role: string;
-      email: string;
-      sub: string;
-    };
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as TokenDto;
     if (decoded.role !== 'Admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }

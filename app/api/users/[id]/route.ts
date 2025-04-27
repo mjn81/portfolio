@@ -5,6 +5,7 @@ import { supabase } from '@/lib/db-client';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { cookies } from 'next/headers';
+import { TokenDto } from '@/types/user';
 
 export async function GET(
 	request: NextRequest,
@@ -48,11 +49,7 @@ export async function PUT(
 
 	let decoded;
 	try {
-		decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
-			role: string;
-			email: string;
-			sub: string;
-		};
+		decoded = jwt.verify(token, process.env.JWT_SECRET!) as TokenDto;
 	} catch (err) {
 		return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
 	}
