@@ -4,19 +4,9 @@ import { cn, checkReadTimeFormat } from '@/lib/utils';
 
 import type React from 'react';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-	ArrowLeft,
-	ImageIcon,
-	Loader2,
-	Link2,
-	Info,
-	Tag,
-	Globe,
-	Clock,
-	Calendar,
-} from 'lucide-react';
+import { ArrowLeft, ImageIcon, Loader2, Calendar, Trash } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -42,6 +32,8 @@ import {
 } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
+import { ImageGalleryPicker } from '@/components/admin/image-gallery-picker';
+import Image from 'next/image';
 
 function CreatePostPage() {
 	const [isSubmitting, setIsSubmitting] = useState(false);
@@ -61,6 +53,9 @@ function CreatePostPage() {
 	);
 	const [scheduledTime, setScheduledTime] = useState('12:00');
 	const [scheduledError, setScheduledError] = useState('');
+	const [galleryOpen, setGalleryOpen] = useState(false);
+	const [featuredImage, setFeaturedImage] = useState<string | null>(null);
+	const [isGalleryOpen, setIsGalleryOpen] = useState(false);
 
 	// SEO fields
 	const [metaTitle, setMetaTitle] = useState('');
@@ -73,7 +68,6 @@ function CreatePostPage() {
 		'/placeholder.svg?height=630&width=1200'
 	);
 
-	const fileInputRef = useRef<HTMLInputElement>(null);
 	const router = useRouter();
 	const { toast } = useToast();
 
@@ -189,7 +183,7 @@ function CreatePostPage() {
 			}
 
 			await new Promise((resolve) => setTimeout(resolve, 1000));
-			console.log(publishData)
+
 			toast({
 				title: status === 'scheduled' ? 'Post scheduled' : 'Post created',
 				description:
@@ -221,23 +215,18 @@ function CreatePostPage() {
 		);
 	};
 
-	const handleCoverImageClick = () => {
-		fileInputRef.current?.click();
+	const handleSelectImage = (imageUrl: string, altText: string) => {
+		setCoverImage(imageUrl);
+
+		// Also update OG image if it's still the default
+		if (ogImage.includes('placeholder.svg')) {
+			setOgImage(imageUrl);
+		}
 	};
 
-	const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-		const file = e.target.files?.[0];
-		if (file) {
-			// In a real app, you would upload the file to a server
-			// For now, we'll just create a local URL
-			const url = URL.createObjectURL(file);
-			setCoverImage(url);
-
-			// Also update OG image if it's still the default
-			if (ogImage.includes('placeholder.svg')) {
-				setOgImage(url);
-			}
-		}
+	const handleSelectFeaturedImage = (imageUrl: string) => {
+		setFeaturedImage(imageUrl);
+		setIsGalleryOpen(false);
 	};
 
 	const getFormattedScheduledDate = () => {
@@ -266,7 +255,7 @@ function CreatePostPage() {
 					<TabsList className="mb-6 w-full justify-start overflow-x-auto">
 						<TabsTrigger value="content">Content</TabsTrigger>
 						<TabsTrigger value="seo">SEO & Meta</TabsTrigger>
-						{/* <TabsTrigger value="settings">Settings</TabsTrigger> */}
+						<TabsTrigger value="settings">Settings</TabsTrigger>
 					</TabsList>
 
 					<TabsContent value="content" className="space-y-6">
@@ -332,37 +321,43 @@ function CreatePostPage() {
 								<Card>
 									<CardContent className="p-4">
 										<div className="space-y-2">
-											<Label>Cover Image</Label>
-											<div
-												className="relative aspect-video overflow-hidden rounded-md border border-dashed border-muted-foreground/25 cursor-pointer"
-												onClick={handleCoverImageClick}
-											>
-												<img
-													src={coverImage || '/placeholder.svg'}
-													alt="Cover"
-													className="h-full w-full object-cover"
-												/>
-												<div className="absolute inset-0 flex items-center justify-center bg-black/5 transition-opacity hover:bg-black/10">
-													<Button
-														variant="secondary"
-														size="sm"
-														className="gap-1.5"
-													>
-														<ImageIcon className="h-4 w-4" />
-														Change Cover
-													</Button>
-												</div>
-												<input
-													ref={fileInputRef}
-													type="file"
-													accept="image/*"
-													className="hidden"
-													onChange={handleFileChange}
-												/>
+											<Label htmlFor="featured-image">Featured Image</Label>
+											<div className="flex flex-col gap-4">
+												{featuredImage ? (
+													<div className="relative aspect-video w-full overflow-hidden rounded-lg border">
+														<Image
+															src={featuredImage || '/placeholder.svg'}
+															alt="Featured image"
+															fill
+															className="object-cover"
+														/>
+														<Button
+															variant="destructive"
+															size="icon"
+															className="absolute top-2 right-2"
+															onClick={() => setFeaturedImage(null)}
+														>
+															<Trash className="h-4 w-4" />
+														</Button>
+													</div>
+												) : (
+													<div className="flex aspect-video w-full items-center justify-center rounded-lg border border-dashed">
+														<div className="flex flex-col items-center gap-1 text-center">
+															<ImageIcon className="h-8 w-8 text-muted-foreground" />
+															<p className="text-sm text-muted-foreground">
+																No featured image selected
+															</p>
+														</div>
+													</div>
+												)}
+												<Button
+													type="button"
+													variant="outline"
+													onClick={() => setIsGalleryOpen(true)}
+												>
+													{featuredImage ? 'Change Image' : 'Select Image'}
+												</Button>
 											</div>
-											<p className="text-xs text-muted-foreground">
-												Recommended size: 1200x630 pixels
-											</p>
 										</div>
 									</CardContent>
 								</Card>
@@ -406,74 +401,42 @@ function CreatePostPage() {
 																	!scheduledDate && 'text-muted-foreground'
 																)}
 															>
-																<Calendar className="mr-2 h-4 w-4" />
-																{getFormattedScheduledDate()}
+																<Calendar className="mr-2" />
 															</Button>
 														</PopoverTrigger>
-														<PopoverContent className="w-auto p-0">
+														<PopoverContent
+															className="w-auto p-0"
+															align="center"
+															side="bottom"
+														>
 															<CalendarComponent
 																mode="single"
 																selected={scheduledDate}
 																onSelect={setScheduledDate}
-																initialFocus
 																disabled={(date) => date < new Date()}
+																initialFocus
 															/>
 														</PopoverContent>
 													</Popover>
-
-													<div className="relative">
-														<Input
-															type="time"
-															value={scheduledTime}
-															onChange={handleTimeChange}
-															className="pl-10"
-														/>
-														<Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-													</div>
+													<Input
+														type="time"
+														value={scheduledTime}
+														onChange={handleTimeChange}
+														className="col-span-1"
+													/>
 												</div>
-
 												{scheduledError && (
 													<p className="text-xs text-red-500">
 														{scheduledError}
 													</p>
 												)}
-
-												<p className="text-xs text-muted-foreground">
-													Your post will be automatically published at the
-													scheduled date and time.
-												</p>
 											</div>
 										)}
+									</CardContent>
+								</Card>
 
-										<div className="space-y-2">
-											<Label htmlFor="readTime">Read Time</Label>
-											<div className="relative">
-												<div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-													<Clock className="h-4 w-4 text-muted-foreground" />
-												</div>
-												<Input
-													id="readTime"
-													placeholder="5 min read"
-													value={readTime}
-													onChange={handleReadTimeChange}
-													className={cn(
-														'pl-10',
-														readTimeError
-															? 'border-red-500 focus-visible:ring-red-500'
-															: ''
-													)}
-												/>
-											</div>
-											{readTimeError && (
-												<p className="text-xs text-red-500">
-													Please use the format "5 min read" or "2 hours read"
-												</p>
-											)}
-											<p className="text-xs text-muted-foreground">
-												Format: "5 min read" or "1 hours read"
-											</p>
-										</div>
-
+								<Card>
+									<CardContent className="p-4 space-y-4">
 										<div className="space-y-2">
 											<Label htmlFor="tags">Tags</Label>
 											<MultiSelect
@@ -483,9 +446,22 @@ function CreatePostPage() {
 												placeholder="Select or create tags..."
 												creatable={true}
 											/>
-											<p className="text-xs text-muted-foreground">
-												Select from existing tags or create new ones
-											</p>
+										</div>
+
+										<div className="space-y-2">
+											<Label htmlFor="readTime">Read Time</Label>
+											<Input
+												id="readTime"
+												placeholder="e.g., 5 min read, 1 hours read"
+												value={readTime}
+												onChange={handleReadTimeChange}
+												onBlur={() => validateReadTime(readTime)}
+											/>
+											{readTimeError && (
+												<p className="text-xs text-red-500">
+													Invalid format. Use '5 min read' or '1 hours read'.
+												</p>
+											)}
 										</div>
 									</CardContent>
 								</Card>
@@ -494,318 +470,129 @@ function CreatePostPage() {
 					</TabsContent>
 
 					<TabsContent value="seo" className="space-y-6">
-						<div className="grid gap-6 md:grid-cols-3">
-							<div className="space-y-6 md:col-span-2">
+						<div className="grid gap-6 md:grid-cols-2">
+							<div className="space-y-4">
 								<div className="space-y-2">
-									<div className="flex items-center gap-2">
-										<Label htmlFor="metaTitle">Meta Title</Label>
-										<div className="text-xs text-muted-foreground">
-											(Recommended: 50-60 characters)
-										</div>
-									</div>
+									<Label htmlFor="metaTitle">Meta Title</Label>
 									<Input
 										id="metaTitle"
-										placeholder="SEO optimized title"
+										placeholder="Enter meta title"
 										value={metaTitle}
 										onChange={(e) => setMetaTitle(e.target.value)}
 									/>
-									<div className="text-xs text-muted-foreground text-right">
-										{metaTitle.length}/60 characters
-									</div>
 								</div>
 
 								<div className="space-y-2">
-									<div className="flex items-center gap-2">
-										<Label htmlFor="metaDescription">Meta Description</Label>
-										<div className="text-xs text-muted-foreground">
-											(Recommended: 150-160 characters)
-										</div>
-									</div>
+									<Label htmlFor="metaDescription">Meta Description</Label>
 									<Textarea
 										id="metaDescription"
-										placeholder="Brief SEO description for search engines"
+										placeholder="Enter meta description"
 										value={metaDescription}
 										onChange={(e) => setMetaDescription(e.target.value)}
 										className="min-h-[100px]"
 									/>
-									<div className="text-xs text-muted-foreground text-right">
-										{metaDescription.length}/160 characters
-									</div>
+								</div>
+
+								<div className="space-y-2">
+									<Label htmlFor="canonicalUrl">Canonical URL</Label>
+									<Input
+										id="canonicalUrl"
+										placeholder="Enter canonical URL"
+										value={canonicalUrl}
+										onChange={(e) => setCanonicalUrl(e.target.value)}
+									/>
 								</div>
 
 								<div className="space-y-2">
 									<Label htmlFor="keywords">Keywords</Label>
 									<Input
 										id="keywords"
-										placeholder="SEO keywords (comma separated)"
+										placeholder="Enter keywords (comma separated)"
 										value={keywords}
 										onChange={(e) => setKeywords(e.target.value)}
 									/>
 								</div>
-
-								<div className="space-y-2">
-									<div className="flex items-center gap-2">
-										<Label htmlFor="canonicalUrl">Canonical URL</Label>
-										<Link2 className="h-4 w-4 text-muted-foreground" />
-									</div>
-									<Input
-										id="canonicalUrl"
-										placeholder="https://example.com/canonical-page"
-										value={canonicalUrl}
-										onChange={(e) => setCanonicalUrl(e.target.value)}
-									/>
-								</div>
 							</div>
 
-							<div className="space-y-6">
-								<Card>
-									<CardContent className="p-4 space-y-4">
-										<div className="flex items-center gap-2">
-											<Globe className="h-4 w-4" />
-											<h3 className="font-medium">Social Media Preview</h3>
-										</div>
+							<div className="space-y-4">
+								<div className="space-y-2">
+									<Label htmlFor="ogTitle">OG Title</Label>
+									<Input
+										id="ogTitle"
+										placeholder="Enter OG title"
+										value={ogTitle}
+										onChange={(e) => setOgTitle(e.target.value)}
+									/>
+								</div>
 
-										<div className="space-y-2">
-											<Label htmlFor="ogTitle">OG Title</Label>
-											<Input
-												id="ogTitle"
-												placeholder="Title for social media"
-												value={ogTitle}
-												onChange={(e) => setOgTitle(e.target.value)}
-											/>
-										</div>
+								<div className="space-y-2">
+									<Label htmlFor="ogDescription">OG Description</Label>
+									<Textarea
+										id="ogDescription"
+										placeholder="Enter OG description"
+										value={ogDescription}
+										onChange={(e) => setOgDescription(e.target.value)}
+										className="min-h-[100px]"
+									/>
+								</div>
 
-										<div className="space-y-2">
-											<Label htmlFor="ogDescription">OG Description</Label>
-											<Textarea
-												id="ogDescription"
-												placeholder="Description for social media"
-												value={ogDescription}
-												onChange={(e) => setOgDescription(e.target.value)}
-											/>
+								<div className="space-y-2">
+									<Label htmlFor="ogImage">OG Image</Label>
+									<div
+										className="relative aspect-video overflow-hidden rounded-md border border-dashed border-muted-foreground/25 cursor-pointer"
+										onClick={() => setGalleryOpen(true)}
+									>
+										<img
+											src={ogImage || '/placeholder.svg'}
+											alt="OG Image"
+											className="h-full w-full object-cover"
+										/>
+										<div className="absolute inset-0 flex items-center justify-center bg-black/5 transition-opacity hover:bg-black/10">
+											<Button variant="secondary" size="sm" className="gap-1.5">
+												<ImageIcon className="h-4 w-4" />
+												{ogImage === '/placeholder.svg?height=630&width=1200'
+													? 'Add OG Image'
+													: 'Change OG Image'}
+											</Button>
 										</div>
-
-										<div className="space-y-2">
-											<Label>OG Image</Label>
-											<div
-												className="relative aspect-[1.91/1] overflow-hidden rounded-md border border-dashed border-muted-foreground/25 cursor-pointer"
-												onClick={() =>
-													document.getElementById('ogImageInput')?.click()
-												}
-											>
-												<img
-													src={ogImage || '/placeholder.svg'}
-													alt="OG Image"
-													className="h-full w-full object-cover"
-												/>
-												<div className="absolute inset-0 flex items-center justify-center bg-black/5 transition-opacity hover:bg-black/10">
-													<Button
-														variant="secondary"
-														size="sm"
-														className="gap-1.5"
-													>
-														<ImageIcon className="h-4 w-4" />
-														Change Image
-													</Button>
-												</div>
-												<input
-													id="ogImageInput"
-													type="file"
-													accept="image/*"
-													className="hidden"
-													onChange={(e) => {
-														const file = e.target.files?.[0];
-														if (file) {
-															const url = URL.createObjectURL(file);
-															setOgImage(url);
-														}
-													}}
-												/>
-											</div>
-											<p className="text-xs text-muted-foreground">
-												Recommended size: 1200x630 pixels
-											</p>
-										</div>
-									</CardContent>
-								</Card>
-
-								<Card>
-									<CardContent className="p-4">
-										<div className="flex items-center gap-2 mb-3">
-											<Info className="h-4 w-4 text-blue-500" />
-											<h3 className="font-medium">SEO Tips</h3>
-										</div>
-										<ul className="text-xs space-y-2 text-muted-foreground">
-											<li>
-												• Use keywords naturally in your title and description
-											</li>
-											<li>• Keep meta titles under 60 characters</li>
-											<li>• Keep meta descriptions under 160 characters</li>
-											<li>• Use unique, descriptive titles for each page</li>
-											<li>
-												• Include a call-to-action in your meta description
-											</li>
-										</ul>
-									</CardContent>
-								</Card>
+									</div>
+									<p className="text-xs text-muted-foreground">
+										Recommended size: 1200x630 pixels
+									</p>
+								</div>
 							</div>
 						</div>
 					</TabsContent>
 
-					{/* <TabsContent value="settings" className="space-y-6">
-						<div className="grid gap-6 md:grid-cols-2">
-							<Card>
-								<CardContent className="p-4 space-y-4">
-									<h3 className="font-medium">Publishing Settings</h3>
-
-									<div className="space-y-2">
-										<Label htmlFor="status">Status</Label>
-										<Select value={status} onValueChange={setStatus}>
-											<SelectTrigger>
-												<SelectValue placeholder="Select status" />
-											</SelectTrigger>
-											<SelectContent>
-												<SelectItem value="published">Published</SelectItem>
-												<SelectItem value="draft">Draft</SelectItem>
-												<SelectItem value="scheduled">Scheduled</SelectItem>
-											</SelectContent>
-										</Select>
-									</div>
-
-									{status === 'scheduled' && (
-										<div className="space-y-2 border rounded-md p-3 bg-muted/30">
-											<div className="flex items-center justify-between">
-												<Label htmlFor="scheduledDate">
-													Publication Date & Time
-												</Label>
-												{scheduledDate && (
-													<Badge variant="outline" className="ml-2">
-														Scheduled
-													</Badge>
-												)}
-											</div>
-
-											<div className="grid grid-cols-2 gap-2">
-												<Popover>
-													<PopoverTrigger asChild>
-														<Button
-															variant="outline"
-															className={cn(
-																'justify-start text-left font-normal',
-																!scheduledDate && 'text-muted-foreground'
-															)}
-														>
-															<Calendar className="mr-2 h-4 w-4" />
-															{getFormattedScheduledDate()}
-														</Button>
-													</PopoverTrigger>
-													<PopoverContent className="w-auto p-0">
-														<CalendarComponent
-															mode="single"
-															selected={scheduledDate}
-															onSelect={setScheduledDate}
-															initialFocus
-															disabled={(date) => date < new Date()}
-														/>
-													</PopoverContent>
-												</Popover>
-
-												<div className="relative">
-													<Input
-														type="time"
-														value={scheduledTime}
-														onChange={handleTimeChange}
-														className="pl-10"
-													/>
-													<Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-												</div>
-											</div>
-
-											{scheduledError && (
-												<p className="text-xs text-red-500">{scheduledError}</p>
-											)}
-
-											<p className="text-xs text-muted-foreground">
-												Your post will be automatically published at the
-												scheduled date and time.
-											</p>
-										</div>
-									)}
-
-									<div className="space-y-2">
-										<Label htmlFor="author">Author</Label>
-										<Select defaultValue="current">
-											<SelectTrigger>
-												<SelectValue placeholder="Select author" />
-											</SelectTrigger>
-											<SelectContent>
-												<SelectItem value="current">Current User</SelectItem>
-												<SelectItem value="admin">Admin</SelectItem>
-												<SelectItem value="editor">Editor</SelectItem>
-											</SelectContent>
-										</Select>
-									</div>
-								</CardContent>
-							</Card>
-
-							<Card>
-								<CardContent className="p-4 space-y-4">
-									<h3 className="font-medium">Categories</h3>
-
-									<div className="space-y-2">
-										<Label htmlFor="category">Primary Category</Label>
-										<Select defaultValue="uncategorized">
-											<SelectTrigger>
-												<SelectValue placeholder="Select category" />
-											</SelectTrigger>
-											<SelectContent>
-												<SelectItem value="uncategorized">
-													Uncategorized
-												</SelectItem>
-												<SelectItem value="technology">Technology</SelectItem>
-												<SelectItem value="design">Design</SelectItem>
-												<SelectItem value="development">Development</SelectItem>
-												<SelectItem value="business">Business</SelectItem>
-											</SelectContent>
-										</Select>
-									</div>
-
-									<div className="space-y-2">
-										<div className="flex items-center gap-2">
-											<Label htmlFor="tags">Tags</Label>
-											<Tag className="h-4 w-4 text-muted-foreground" />
-										</div>
-										<MultiSelect
-											options={tagOptions}
-											selected={tags}
-											onChange={setTags}
-											placeholder="Select or create tags..."
-											creatable={true}
-										/>
-										<p className="text-xs text-muted-foreground">
-											Select from existing tags or create new ones
-										</p>
-									</div>
-								</CardContent>
-							</Card>
+					<TabsContent value="settings" className="space-y-6">
+						<div>
+							<Label>Settings content here</Label>
 						</div>
-					</TabsContent> */}
+					</TabsContent>
 				</Tabs>
 
-				<div className="flex flex-wrap gap-2">
-					<Button type="submit" disabled={isSubmitting}>
-						{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-						{status === 'published'
-							? 'Publish Post'
-							: status === 'scheduled'
-							? 'Schedule Post'
-							: 'Save as Draft'}
-					</Button>
+				<div className="flex justify-end gap-4">
 					<Button type="button" variant="outline" onClick={() => router.back()}>
 						Cancel
 					</Button>
+					<Button type="submit" disabled={isSubmitting}>
+						{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+						Create Post
+					</Button>
 				</div>
 			</form>
+
+			<ImageGalleryPicker
+				open={galleryOpen}
+				onOpenChange={setGalleryOpen}
+				onSelectImage={handleSelectImage}
+			/>
+			<ImageGalleryPicker
+				open={isGalleryOpen}
+				onOpenChange={setIsGalleryOpen}
+				onSelectImage={handleSelectFeaturedImage}
+				isPostImageUpload={true}
+			/>
 		</div>
 	);
 }

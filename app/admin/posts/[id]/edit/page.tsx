@@ -1,8 +1,10 @@
 'use client';
 
+import { cn, checkReadTimeFormat } from '@/lib/utils';
+
 import type React from 'react';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
 	ArrowLeft,
@@ -12,6 +14,8 @@ import {
 	Info,
 	Tag,
 	Globe,
+	Clock,
+	Calendar,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,6 +35,17 @@ import { withAuth } from '@/hooks/use-auth';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RichTextEditor } from '@/components/admin/rich-text-editor';
 import { MultiSelect } from '@/components/ui/multi-select';
+import { format } from 'date-fns';
+import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { Badge } from '@/components/ui/badge';
+import { ImageGalleryPicker } from '@/components/admin/image-gallery-picker';
+import Image from 'next/image';
+import { Trash } from 'lucide-react';
 
 function EditPostPage({ params }: { params: { id: string } }) {
 	const [isLoading, setIsLoading] = useState(true);
@@ -42,6 +57,15 @@ function EditPostPage({ params }: { params: { id: string } }) {
 	const [coverImage, setCoverImage] = useState('');
 	const [status, setStatus] = useState('draft');
 	const [tags, setTags] = useState<string[]>([]);
+	const [readTime, setReadTime] = useState('');
+	const [readTimeError, setReadTimeError] = useState(false);
+	const [scheduledDate, setScheduledDate] = useState<Date | undefined>(
+		undefined
+	);
+	const [scheduledTime, setScheduledTime] = useState('12:00');
+	const [scheduledError, setScheduledError] = useState('');
+	const [galleryOpen, setGalleryOpen] = useState(false);
+	const [ogGalleryOpen, setOgGalleryOpen] = useState(false);
 
 	// SEO fields
 	const [metaTitle, setMetaTitle] = useState('');
@@ -52,9 +76,24 @@ function EditPostPage({ params }: { params: { id: string } }) {
 	const [ogDescription, setOgDescription] = useState('');
 	const [ogImage, setOgImage] = useState('');
 
-	const fileInputRef = useRef<HTMLInputElement>(null);
 	const router = useRouter();
 	const { toast } = useToast();
+
+	// Available tag options
+	const tagOptions = [
+		{ value: 'nextjs', label: 'Next.js' },
+		{ value: 'react', label: 'React' },
+		{ value: 'javascript', label: 'JavaScript' },
+		{ value: 'typescript', label: 'TypeScript' },
+		{ value: 'tutorial', label: 'Tutorial' },
+		{ value: 'design', label: 'Design' },
+		{ value: 'ui', label: 'UI' },
+		{ value: 'ux', label: 'UX' },
+		{ value: 'frontend', label: 'Frontend' },
+		{ value: 'backend', label: 'Backend' },
+		{ value: 'fullstack', label: 'Full Stack' },
+		{ value: 'development', label: 'Development' },
+	];
 
 	useEffect(() => {
 		// In a real app, this would be an API call
@@ -68,6 +107,21 @@ function EditPostPage({ params }: { params: { id: string } }) {
 			setCoverImage(post.coverImage);
 			setStatus(post.status);
 			setTags(post.tags);
+			setReadTime(post.readTime || '');
+
+			// Set scheduled date if post is scheduled
+			if (post.status === 'scheduled' && post.scheduledPublishTime) {
+				const scheduledDateTime = new Date(post.scheduledPublishTime);
+				setScheduledDate(scheduledDateTime);
+
+				// Format time as HH:MM
+				const hours = scheduledDateTime.getHours().toString().padStart(2, '0');
+				const minutes = scheduledDateTime
+					.getMinutes()
+					.toString()
+					.padStart(2, '0');
+				setScheduledTime(`${hours}:${minutes}`);
+			}
 
 			// Set SEO fields with defaults if not available
 			setMetaTitle(post.metaTitle || post.title);
@@ -91,17 +145,112 @@ function EditPostPage({ params }: { params: { id: string } }) {
 		}
 	}, [params.id, router, toast]);
 
+	// Effect to handle status change
+	useEffect(() => {
+		if (status === 'scheduled' && !scheduledDate) {
+			// Default to tomorrow
+			const tomorrow = new Date();
+			tomorrow.setDate(tomorrow.getDate() + 1);
+			setScheduledDate(tomorrow);
+		}
+	}, [status]);
+
+	const validateReadTime = (value: string) => {
+		if (!value) {
+			setReadTimeError(false);
+			return;
+		}
+
+		const isValid = checkReadTimeFormat(value);
+		setReadTimeError(!isValid);
+		return isValid;
+	};
+
+	const handleReadTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const value = e.target.value;
+		setReadTime(value);
+		validateReadTime(value);
+	};
+
+	const validateScheduledDateTime = () => {
+		if (status !== 'scheduled') return true;
+
+		if (!scheduledDate) {
+			setScheduledError('Please select a publication date');
+			return false;
+		}
+
+		const [hours, minutes] = scheduledTime.split(':').map(Number);
+		const scheduledDateTime = new Date(scheduledDate);
+		scheduledDateTime.setHours(hours, minutes, 0, 0);
+
+		const now = new Date();
+
+		if (scheduledDateTime <= now) {
+			setScheduledError('Scheduled time must be in the future');
+			return false;
+		}
+
+		setScheduledError('');
+		return true;
+	};
+
+	const handleTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		setScheduledTime(e.target.value);
+		validateScheduledDateTime();
+	};
+
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
+
+		// Validate read time before submission
+		if (readTime && !validateReadTime(readTime)) {
+			toast({
+				title: 'Invalid read time format',
+				description: "Please use the format '5 min read' or '1 hours read'",
+				variant: 'destructive',
+			});
+			return;
+		}
+
+		// Validate scheduled date/time
+		if (!validateScheduledDateTime()) {
+			toast({
+				title: 'Invalid scheduled time',
+				description: scheduledError,
+				variant: 'destructive',
+			});
+			return;
+		}
+
 		setIsSubmitting(true);
 
 		try {
-			// In a real app, this would be an API call
+			// In a real app, this would be an API call with the scheduled date/time
+			// For scheduled posts, we would include the scheduledDate and scheduledTime
+			let publishData = {};
+
+			if (status === 'scheduled' && scheduledDate) {
+				const [hours, minutes] = scheduledTime.split(':').map(Number);
+				const scheduledDateTime = new Date(scheduledDate);
+				scheduledDateTime.setHours(hours, minutes, 0, 0);
+
+				publishData = {
+					scheduledPublishTime: scheduledDateTime.toISOString(),
+				};
+			}
+
 			await new Promise((resolve) => setTimeout(resolve, 1000));
 
 			toast({
-				title: 'Post updated',
-				description: 'Your post has been updated successfully.',
+				title: status === 'scheduled' ? 'Post scheduled' : 'Post updated',
+				description:
+					status === 'scheduled'
+						? `Your post has been scheduled for publication on ${format(
+								scheduledDate!,
+								'PPP'
+						  )} at ${scheduledTime}.`
+						: 'Your post has been updated successfully.',
 			});
 			router.push('/admin/posts');
 		} catch (error) {
@@ -124,18 +273,19 @@ function EditPostPage({ params }: { params: { id: string } }) {
 		);
 	};
 
-	const handleCoverImageClick = () => {
-		fileInputRef.current?.click();
+	const handleSelectCoverImage = (imageUrl: string) => {
+		setCoverImage(imageUrl);
+		setGalleryOpen(false);
 	};
 
-	const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-		const file = e.target.files?.[0];
-		if (file) {
-			// In a real app, you would upload the file to a server
-			// For now, we'll just create a local URL
-			const url = URL.createObjectURL(file);
-			setCoverImage(url);
-		}
+	const handleSelectOgImage = (imageUrl: string) => {
+		setOgImage(imageUrl);
+		setOgGalleryOpen(false);
+	};
+
+	const getFormattedScheduledDate = () => {
+		if (!scheduledDate) return 'Select date';
+		return format(scheduledDate, 'PPP');
 	};
 
 	if (isLoading) {
@@ -235,37 +385,43 @@ function EditPostPage({ params }: { params: { id: string } }) {
 								<Card>
 									<CardContent className="p-4">
 										<div className="space-y-2">
-											<Label>Cover Image</Label>
-											<div
-												className="relative aspect-video overflow-hidden rounded-md border border-dashed border-muted-foreground/25 cursor-pointer"
-												onClick={handleCoverImageClick}
-											>
-												<img
-													src={coverImage || '/placeholder.svg'}
-													alt="Cover"
-													className="h-full w-full object-cover"
-												/>
-												<div className="absolute inset-0 flex items-center justify-center bg-black/5 transition-opacity hover:bg-black/10">
-													<Button
-														variant="secondary"
-														size="sm"
-														className="gap-1.5"
-													>
-														<ImageIcon className="h-4 w-4" />
-														Change Cover
-													</Button>
-												</div>
-												<input
-													ref={fileInputRef}
-													type="file"
-													accept="image/*"
-													className="hidden"
-													onChange={handleFileChange}
-												/>
+											<Label htmlFor="featured-image">Featured Image</Label>
+											<div className="flex flex-col gap-4">
+												{coverImage ? (
+													<div className="relative aspect-video w-full overflow-hidden rounded-lg border">
+														<Image
+															src={coverImage || '/placeholder.svg'}
+															alt="Featured image"
+															fill
+															className="object-cover"
+														/>
+														<Button
+															variant="destructive"
+															size="icon"
+															className="absolute top-2 right-2"
+															onClick={() => setCoverImage('')}
+														>
+															<Trash className="h-4 w-4" />
+														</Button>
+													</div>
+												) : (
+													<div className="flex aspect-video w-full items-center justify-center rounded-lg border border-dashed">
+														<div className="flex flex-col items-center gap-1 text-center">
+															<ImageIcon className="h-8 w-8 text-muted-foreground" />
+															<p className="text-sm text-muted-foreground">
+																No featured image selected
+															</p>
+														</div>
+													</div>
+												)}
+												<Button
+													type="button"
+													variant="outline"
+													onClick={() => setGalleryOpen(true)}
+												>
+													{coverImage ? 'Change Image' : 'Select Image'}
+												</Button>
 											</div>
-											<p className="text-xs text-muted-foreground">
-												Recommended size: 1200x630 pixels
-											</p>
 										</div>
 									</CardContent>
 								</Card>
@@ -286,26 +442,108 @@ function EditPostPage({ params }: { params: { id: string } }) {
 											</Select>
 										</div>
 
+										{status === 'scheduled' && (
+											<div className="space-y-2 border rounded-md p-3 bg-muted/30">
+												<div className="flex items-center justify-between">
+													<Label htmlFor="scheduledDate">
+														Publication Date
+													</Label>
+													{scheduledDate && (
+														<Badge variant="outline" className="ml-2">
+															Scheduled
+														</Badge>
+													)}
+												</div>
+
+												<div className="grid grid-cols-2 gap-2">
+													<Popover>
+														<PopoverTrigger asChild>
+															<Button
+																variant="outline"
+																className={cn(
+																	'justify-start text-left font-normal',
+																	!scheduledDate && 'text-muted-foreground'
+																)}
+															>
+																<Calendar className="mr-2 h-4 w-4" />
+																{getFormattedScheduledDate()}
+															</Button>
+														</PopoverTrigger>
+														<PopoverContent className="w-auto p-0">
+															<CalendarComponent
+																mode="single"
+																selected={scheduledDate}
+																onSelect={setScheduledDate}
+																initialFocus
+																disabled={(date) => date < new Date()}
+															/>
+														</PopoverContent>
+													</Popover>
+
+													<div className="relative">
+														<Input
+															type="time"
+															value={scheduledTime}
+															onChange={handleTimeChange}
+															className="pl-10"
+														/>
+														<Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+													</div>
+												</div>
+
+												{scheduledError && (
+													<p className="text-xs text-red-500">
+														{scheduledError}
+													</p>
+												)}
+
+												<p className="text-xs text-muted-foreground">
+													Your post will be automatically published at the
+													scheduled date and time.
+												</p>
+											</div>
+										)}
+
+										<div className="space-y-2">
+											<Label htmlFor="readTime">Read Time</Label>
+											<div className="relative">
+												<div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+													<Clock className="h-4 w-4 text-muted-foreground" />
+												</div>
+												<Input
+													id="readTime"
+													placeholder="5 min read"
+													value={readTime}
+													onChange={handleReadTimeChange}
+													className={cn(
+														'pl-10',
+														readTimeError
+															? 'border-red-500 focus-visible:ring-red-500'
+															: ''
+													)}
+												/>
+											</div>
+											{readTimeError && (
+												<p className="text-xs text-red-500">
+													Please use the format "5 min read" or "2 hours read"
+												</p>
+											)}
+											<p className="text-xs text-muted-foreground">
+												Format: "5 min read" or "1 hours read"
+											</p>
+										</div>
+
 										<div className="space-y-2">
 											<Label htmlFor="tags">Tags</Label>
 											<MultiSelect
-												options={[
-													{ value: 'nextjs', label: 'Next.js' },
-													{ value: 'react', label: 'React' },
-													{ value: 'javascript', label: 'JavaScript' },
-													{ value: 'typescript', label: 'TypeScript' },
-													{ value: 'tutorial', label: 'Tutorial' },
-													{ value: 'design', label: 'Design' },
-													{ value: 'ui', label: 'UI' },
-													{ value: 'ux', label: 'UX' },
-												]}
+												options={tagOptions}
 												selected={tags}
 												onChange={setTags}
 												placeholder="Select or create tags..."
 												creatable={true}
 											/>
 											<p className="text-xs text-muted-foreground">
-												Press Enter or comma to add a new tag
+												Select from existing tags or create new ones
 											</p>
 										</div>
 									</CardContent>
@@ -410,9 +648,7 @@ function EditPostPage({ params }: { params: { id: string } }) {
 											<Label>OG Image</Label>
 											<div
 												className="relative aspect-[1.91/1] overflow-hidden rounded-md border border-dashed border-muted-foreground/25 cursor-pointer"
-												onClick={() =>
-													document.getElementById('ogImageInput')?.click()
-												}
+												onClick={() => setOgGalleryOpen(true)}
 											>
 												<img
 													src={ogImage || '/placeholder.svg'}
@@ -426,22 +662,9 @@ function EditPostPage({ params }: { params: { id: string } }) {
 														className="gap-1.5"
 													>
 														<ImageIcon className="h-4 w-4" />
-														Change Image
+														{!ogImage ? 'Add OG Image' : 'Change Image'}
 													</Button>
 												</div>
-												<input
-													id="ogImageInput"
-													type="file"
-													accept="image/*"
-													className="hidden"
-													onChange={(e) => {
-														const file = e.target.files?.[0];
-														if (file) {
-															const url = URL.createObjectURL(file);
-															setOgImage(url);
-														}
-													}}
-												/>
 											</div>
 											<p className="text-xs text-muted-foreground">
 												Recommended size: 1200x630 pixels
@@ -480,13 +703,78 @@ function EditPostPage({ params }: { params: { id: string } }) {
 									<h3 className="font-medium">Publishing Settings</h3>
 
 									<div className="space-y-2">
-										<Label htmlFor="publishDate">Publish Date</Label>
-										<Input
-											id="publishDate"
-											type="datetime-local"
-											className="w-full"
-										/>
+										<Label htmlFor="status">Status</Label>
+										<Select value={status} onValueChange={setStatus}>
+											<SelectTrigger>
+												<SelectValue placeholder="Select status" />
+											</SelectTrigger>
+											<SelectContent>
+												<SelectItem value="published">Published</SelectItem>
+												<SelectItem value="draft">Draft</SelectItem>
+												<SelectItem value="scheduled">Scheduled</SelectItem>
+											</SelectContent>
+										</Select>
 									</div>
+
+									{status === 'scheduled' && (
+										<div className="space-y-2 border rounded-md p-3 bg-muted/30">
+											<div className="flex items-center justify-between">
+												<Label htmlFor="scheduledDate">
+													Publication Date & Time
+												</Label>
+												{scheduledDate && (
+													<Badge variant="outline" className="ml-2">
+														Scheduled
+													</Badge>
+												)}
+											</div>
+
+											<div className="grid grid-cols-2 gap-2">
+												<Popover>
+													<PopoverTrigger asChild>
+														<Button
+															variant="outline"
+															className={cn(
+																'justify-start text-left font-normal',
+																!scheduledDate && 'text-muted-foreground'
+															)}
+														>
+															<Calendar className="mr-2 h-4 w-4" />
+															{getFormattedScheduledDate()}
+														</Button>
+													</PopoverTrigger>
+													<PopoverContent className="w-auto p-0">
+														<CalendarComponent
+															mode="single"
+															selected={scheduledDate}
+															onSelect={setScheduledDate}
+															initialFocus
+															disabled={(date) => date < new Date()}
+														/>
+													</PopoverContent>
+												</Popover>
+
+												<div className="relative">
+													<Input
+														type="time"
+														value={scheduledTime}
+														onChange={handleTimeChange}
+														className="pl-10"
+													/>
+													<Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+												</div>
+											</div>
+
+											{scheduledError && (
+												<p className="text-xs text-red-500">{scheduledError}</p>
+											)}
+
+											<p className="text-xs text-muted-foreground">
+												Your post will be automatically published at the
+												scheduled date and time.
+											</p>
+										</div>
+									)}
 
 									<div className="space-y-2">
 										<Label htmlFor="author">Author</Label>
@@ -532,23 +820,14 @@ function EditPostPage({ params }: { params: { id: string } }) {
 											<Tag className="h-4 w-4 text-muted-foreground" />
 										</div>
 										<MultiSelect
-											options={[
-												{ value: 'nextjs', label: 'Next.js' },
-												{ value: 'react', label: 'React' },
-												{ value: 'javascript', label: 'JavaScript' },
-												{ value: 'typescript', label: 'TypeScript' },
-												{ value: 'tutorial', label: 'Tutorial' },
-												{ value: 'design', label: 'Design' },
-												{ value: 'ui', label: 'UI' },
-												{ value: 'ux', label: 'UX' },
-											]}
+											options={tagOptions}
 											selected={tags}
 											onChange={setTags}
 											placeholder="Select or create tags..."
 											creatable={true}
 										/>
 										<p className="text-xs text-muted-foreground">
-											Press Enter or comma to add a new tag
+											Select from existing tags or create new ones
 										</p>
 									</div>
 								</CardContent>
@@ -571,6 +850,20 @@ function EditPostPage({ params }: { params: { id: string } }) {
 					</Button>
 				</div>
 			</form>
+
+			{/* Image Gallery Pickers */}
+			<ImageGalleryPicker
+				open={galleryOpen}
+				onOpenChange={setGalleryOpen}
+				onSelectImage={handleSelectCoverImage}
+				isPostImageUpload={true}
+			/>
+
+			<ImageGalleryPicker
+				open={ogGalleryOpen}
+				onOpenChange={setOgGalleryOpen}
+				onSelectImage={handleSelectOgImage}
+			/>
 		</div>
 	);
 }
