@@ -102,8 +102,8 @@ export async function DELETE(
 		return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
 	}
 
-	const allowedRoles = ['Admin', 'Moderator'];
-	if (!allowedRoles.includes(decoded.role) || decoded.sub !== params.id) {
+	const allowedRoles = ['admin', 'moderator'];
+	if (!allowedRoles.includes(decoded.role.toLowerCase()) || decoded.sub !== params.id) {
 		return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 	}
 	const { error } = await supabase.from('posts').delete().eq('id', params.id);

@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
 		} catch (err) {
 			return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
 		}
-		if (body.is_private === 'true' && decoded.role !== 'admin') {
+		if (body.is_private === 'true' && decoded.role.toLowerCase() !== 'admin') {
 			return NextResponse.json(
 				{ error: 'Only admins can make media private' },
 				{ status: 403 }
@@ -84,6 +84,7 @@ export async function POST(request: NextRequest) {
 			.update({
 				is_private: !mediaData.is_private,
 				url: newUrl,
+				updated_at: new Date().toISOString(),
 			})
 			.eq('id', mediaId);
 
@@ -95,7 +96,7 @@ export async function POST(request: NextRequest) {
 		}
 
 		return NextResponse.json(
-			{ message: 'Media privacy toggled successfully' },
+			{ message: 'Media privacy toggled successfully', privacy: !mediaData.is_private, id: mediaId },
 			{ status: 200 }
 		);
 	} catch (error) {

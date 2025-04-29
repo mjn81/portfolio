@@ -58,12 +58,12 @@ export async function PUT(
 	const updates = await request.json();
 
 	// If the user is not admin and trying to update another user's info
-	if (decoded.role !== 'Admin' && decoded.sub !== id) {
+	if (decoded.role.toLowerCase() !== 'admin' && decoded.sub !== id) {
 		return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 	}
 
 	// Prevent non-admins from changing roles
-	if (decoded.role !== 'Admin') {
+	if (decoded.role.toLowerCase() !== 'admin') {
 		delete updates.role;
 	}
 

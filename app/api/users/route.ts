@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as TokenDto;
-    if (decoded.role !== 'Admin') {
+    if (decoded.role.toLocaleLowerCase() !== 'Admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
   } catch (err) {

@@ -46,7 +46,6 @@ export async function POST(request: NextRequest) {
 		path: '/',
 	});
 
-	console.log("token, ", token);
 
 	return NextResponse.json({ message: 'Login successful' }, { status: 200 });
 }
