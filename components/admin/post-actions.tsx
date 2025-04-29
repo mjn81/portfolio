@@ -12,14 +12,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import type { Post } from "@/lib/mock-data"
+import type { Post } from "@/types/post"
 
 interface PostActionsProps {
   post: Post
   onDelete: () => void
+  onStatusChange: (postId: string, newStatus: 'published' | 'draft') => void
 }
 
-export function PostActions({ post, onDelete }: PostActionsProps) {
+export function PostActions({ post, onDelete, onStatusChange }: PostActionsProps) {
   return (
     <div className="flex justify-end gap-1">
       <TooltipProvider delayDuration={300}>
@@ -91,8 +92,11 @@ export function PostActions({ post, onDelete }: PostActionsProps) {
               View
             </Link>
           </DropdownMenuItem>
-          <DropdownMenuItem>{post.status === "published" ? "Unpublish" : "Publish"}</DropdownMenuItem>
-          <DropdownMenuItem>Duplicate</DropdownMenuItem>
+          <DropdownMenuItem 
+            onClick={() => onStatusChange(post.id, post.status === 'published' ? 'draft' : 'published')}
+          >
+            {post.status === "published" ? "Unpublish" : "Publish"}
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem className="text-red-600" onClick={onDelete}>
             Delete

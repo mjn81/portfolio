@@ -1,21 +1,15 @@
 'use client';
 
-import { cn, checkReadTimeFormat } from '@/lib/utils';
-
-import type React from 'react';
-
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { cn, checkReadTimeFormat, generateSlug as generateSlugUtil } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import {
 	ArrowLeft,
 	ImageIcon,
 	Loader2,
-	Link2,
-	Info,
-	Tag,
-	Globe,
-	Clock,
 	Calendar,
+	Trash,
+	AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,8 +24,6 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
-import { mockPosts } from '@/lib/mock-data';
-import { withAuth } from '@/hooks/use-auth';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RichTextEditor } from '@/components/admin/rich-text-editor';
 import { MultiSelect } from '@/components/ui/multi-select';
@@ -45,122 +37,151 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
 import { ImageGalleryPicker } from '@/components/admin/image-gallery-picker';
 import Image from 'next/image';
-import { Trash } from 'lucide-react';
+import type { Post } from '@/types/post';
+import type { Tag } from '@/types/tag';
+import { withAuth } from '@/hooks/use-auth';
 
-function EditPostPage({ params }: { params: { id: string } }) {
+interface TagOption {
+	value: string;
+	label: string;
+}
+
+interface EditPostPageProps {
+	params: { id: string };
+}
+
+function EditPostPage({ params }: EditPostPageProps) {
+	// @ts-ignore
+	const postId = React.use(params).id;
 	const [isLoading, setIsLoading] = useState(true);
 	const [isSubmitting, setIsSubmitting] = useState(false);
+	const [error, setError] = useState<string | null>(null);
 	const [title, setTitle] = useState('');
 	const [slug, setSlug] = useState('');
 	const [excerpt, setExcerpt] = useState('');
 	const [content, setContent] = useState('');
-	const [coverImage, setCoverImage] = useState('');
-	const [status, setStatus] = useState('draft');
-	const [tags, setTags] = useState<string[]>([]);
+	const [coverImage, setCoverImage] = useState<string | null>(null);
+	const [coverImageAltText, setCoverImageAltText] = useState('');
+	const [status, setStatus] = useState<'draft' | 'published' | 'scheduled'>('draft');
+	const [selectedTags, setSelectedTags] = useState<string[]>([]);
 	const [readTime, setReadTime] = useState('');
 	const [readTimeError, setReadTimeError] = useState(false);
-	const [scheduledDate, setScheduledDate] = useState<Date | undefined>(
-		undefined
-	);
+	const [scheduledDate, setScheduledDate] = useState<Date | undefined>(undefined);
 	const [scheduledTime, setScheduledTime] = useState('12:00');
 	const [scheduledError, setScheduledError] = useState('');
-	const [galleryOpen, setGalleryOpen] = useState(false);
-	const [ogGalleryOpen, setOgGalleryOpen] = useState(false);
-
-	// SEO fields
+	const [isCoverGalleryOpen, setIsCoverGalleryOpen] = useState(false);
+	const [isOgGalleryOpen, setIsOgGalleryOpen] = useState(false);
 	const [metaTitle, setMetaTitle] = useState('');
 	const [metaDescription, setMetaDescription] = useState('');
 	const [canonicalUrl, setCanonicalUrl] = useState('');
 	const [keywords, setKeywords] = useState('');
 	const [ogTitle, setOgTitle] = useState('');
 	const [ogDescription, setOgDescription] = useState('');
-	const [ogImage, setOgImage] = useState('');
+	const [ogImage, setOgImage] = useState<string | null>(null);
+	const [allTags, setAllTags] = useState<Tag[]>([]);
+	const [tagOptions, setTagOptions] = useState<TagOption[]>([]);
 
 	const router = useRouter();
 	const { toast } = useToast();
 
-	// Available tag options
-	const tagOptions = [
-		{ value: 'nextjs', label: 'Next.js' },
-		{ value: 'react', label: 'React' },
-		{ value: 'javascript', label: 'JavaScript' },
-		{ value: 'typescript', label: 'TypeScript' },
-		{ value: 'tutorial', label: 'Tutorial' },
-		{ value: 'design', label: 'Design' },
-		{ value: 'ui', label: 'UI' },
-		{ value: 'ux', label: 'UX' },
-		{ value: 'frontend', label: 'Frontend' },
-		{ value: 'backend', label: 'Backend' },
-		{ value: 'fullstack', label: 'Full Stack' },
-		{ value: 'development', label: 'Development' },
-	];
-
 	useEffect(() => {
-		// In a real app, this would be an API call
-		const post = mockPosts.find((p) => p.id === params.id);
+		const fetchData = async () => {
+			setIsLoading(true);
+			setError(null);
 
-		if (post) {
-			setTitle(post.title);
-			setSlug(post.slug);
-			setExcerpt(post.excerpt);
-			setContent(post.content);
-			setCoverImage(post.coverImage);
-			setStatus(post.status);
-			setTags(post.tags);
-			setReadTime(post.readTime || '');
+			try {
+				const [postResponse, tagsResponse] = await Promise.all([
+					fetch(`/api/posts/${postId}`),
+					fetch('/api/tags')
+				]);
 
-			// Set scheduled date if post is scheduled
-			if (post.status === 'scheduled' && post.scheduledPublishTime) {
-				const scheduledDateTime = new Date(post.scheduledPublishTime);
-				setScheduledDate(scheduledDateTime);
+				if (!tagsResponse.ok) {
+					throw new Error('Failed to fetch tags');
+				}
+				const fetchedTags: Tag[] = await tagsResponse.json();
+				setAllTags(fetchedTags);
+				setTagOptions(fetchedTags.map((tag) => ({ value: tag.id, label: tag.name })));
 
-				// Format time as HH:MM
-				const hours = scheduledDateTime.getHours().toString().padStart(2, '0');
-				const minutes = scheduledDateTime
-					.getMinutes()
-					.toString()
-					.padStart(2, '0');
-				setScheduledTime(`${hours}:${minutes}`);
+				if (!postResponse.ok) {
+					if (postResponse.status === 404) {
+						setError('Post not found. Redirecting...');
+						toast({ title: 'Post not found', variant: 'destructive' });
+						router.push('/admin/posts');
+						return;
+					}
+					throw new Error('Failed to fetch post data.');
+				}
+				const post: Post = await postResponse.json();
+
+				setTitle(post.title || '');
+				setSlug(post.slug || '');
+				setExcerpt(post.excerpt || '');
+				setContent(post.content || '');
+				setCoverImage(post.image || null);
+				setCoverImageAltText(post.image_alt_text || '');
+				setStatus(post.status || 'draft');
+				setReadTime(post.read_time || '');
+				setMetaTitle(post.meta_title || '');
+				setMetaDescription(post.meta_description || '');
+				setCanonicalUrl(post.seo_canonical_url || '');
+				setKeywords(post.seo_keywords || '');
+				setOgTitle(post.og_title || '');
+				setOgDescription(post.og_description || '');
+				setOgImage(post.og_image_url || null);
+
+				if (post.tags && Array.isArray(post.tags)) {
+					const postTagIds = post.tags
+						.map(tag => (typeof tag === 'object' && tag !== null && 'id' in tag) ? tag.id : undefined)
+						.filter((tagId): tagId is string => tagId !== undefined && fetchedTags.some(t => t.id === tagId));
+					setSelectedTags(postTagIds);
+				} else {
+					setSelectedTags([]);
+				}
+
+				if (post.status === 'scheduled' && post.scheduled_publish_time) {
+					const scheduledDateTime = new Date(post.scheduled_publish_time);
+					setScheduledDate(scheduledDateTime);
+					const hours = scheduledDateTime.getHours().toString().padStart(2, '0');
+					const minutes = scheduledDateTime.getMinutes().toString().padStart(2, '0');
+					setScheduledTime(`${hours}:${minutes}`);
+				} else {
+					setScheduledDate(undefined);
+					setScheduledTime('12:00');
+				}
+
+			} catch (error: any) {
+				console.error('Error fetching data:', error);
+				setError(error.message || 'Failed to load edit page data.');
+				toast({
+					title: 'Error Loading Data',
+					description: error.message || 'Could not load required data.',
+					variant: 'destructive',
+				});
+			} finally {
+				setIsLoading(false);
 			}
+		};
 
-			// Set SEO fields with defaults if not available
-			setMetaTitle(post.metaTitle || post.title);
-			setMetaDescription(post.metaDescription || post.excerpt);
-			setCanonicalUrl(
-				post.canonicalUrl || `https://example.com/blog/${post.slug}`
-			);
-			setKeywords(post.keywords || post.tags.join(', '));
-			setOgTitle(post.ogTitle || post.title);
-			setOgDescription(post.ogDescription || post.excerpt);
-			setOgImage(post.ogImage || post.coverImage);
+		fetchData();
+	}, [postId, router, toast]);
 
-			setIsLoading(false);
-		} else {
-			toast({
-				title: 'Post not found',
-				description: 'The post you are trying to edit does not exist.',
-				variant: 'destructive',
-			});
-			router.push('/admin/posts');
-		}
-	}, [params.id, router, toast]);
-
-	// Effect to handle status change
 	useEffect(() => {
 		if (status === 'scheduled' && !scheduledDate) {
-			// Default to tomorrow
 			const tomorrow = new Date();
 			tomorrow.setDate(tomorrow.getDate() + 1);
 			setScheduledDate(tomorrow);
+		} else if (status !== 'scheduled') {
+			setScheduledDate(undefined);
+			setScheduledTime('12:00');
+			setScheduledError('');
 		}
-	}, [status]);
+	}, [status, scheduledDate]);
 
 	const validateReadTime = (value: string) => {
 		if (!value) {
 			setReadTimeError(false);
-			return;
+			return true;
 		}
-
 		const isValid = checkReadTimeFormat(value);
 		setReadTimeError(!isValid);
 		return isValid;
@@ -173,7 +194,10 @@ function EditPostPage({ params }: { params: { id: string } }) {
 	};
 
 	const validateScheduledDateTime = () => {
-		if (status !== 'scheduled') return true;
+		if (status !== 'scheduled') {
+			setScheduledError('');
+			return true;
+		}
 
 		if (!scheduledDate) {
 			setScheduledError('Please select a publication date');
@@ -200,24 +224,20 @@ function EditPostPage({ params }: { params: { id: string } }) {
 		validateScheduledDateTime();
 	};
 
+	useEffect(() => {
+		validateScheduledDateTime();
+	}, [scheduledDate, scheduledTime, status]);
+
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 
-		// Validate read time before submission
-		if (readTime && !validateReadTime(readTime)) {
-			toast({
-				title: 'Invalid read time format',
-				description: "Please use the format '5 min read' or '1 hours read'",
-				variant: 'destructive',
-			});
-			return;
-		}
+		const isReadTimeValid = validateReadTime(readTime);
+		const isScheduleValid = validateScheduledDateTime();
 
-		// Validate scheduled date/time
-		if (!validateScheduledDateTime()) {
+		if (!isReadTimeValid || !isScheduleValid) {
 			toast({
-				title: 'Invalid scheduled time',
-				description: scheduledError,
+				title: 'Validation Error',
+				description: 'Please fix the errors before submitting.',
 				variant: 'destructive',
 			});
 			return;
@@ -225,38 +245,79 @@ function EditPostPage({ params }: { params: { id: string } }) {
 
 		setIsSubmitting(true);
 
+		let scheduledDateTimeString: string | null = null;
+		if (status === 'scheduled' && scheduledDate) {
+			const [hours, minutes] = scheduledTime.split(':').map(Number);
+			const scheduledDateTime = new Date(scheduledDate);
+			scheduledDateTime.setHours(hours, minutes, 0, 0);
+			scheduledDateTimeString = scheduledDateTime.toISOString();
+		}
+
+		const apiTags = selectedTags.map((tagId) => {
+			const existingTag = allTags.find((t) => t.id === tagId);
+			if (existingTag) {
+				return { id: existingTag.id, name: existingTag.name };
+			} else {
+				return { name: tagId };
+			}
+		});
+
+		const postData = {
+			title,
+			slug,
+			excerpt: excerpt || undefined,
+			content: content || undefined,
+			image: coverImage || undefined,
+			image_alt_text: coverImageAltText || undefined,
+			read_time: readTime || undefined,
+			status,
+			meta_title: metaTitle || undefined,
+			meta_description: metaDescription || undefined,
+			og_title: ogTitle || undefined,
+			og_description: ogDescription || undefined,
+			seo_keywords: keywords || undefined,
+			seo_canonical_url: canonicalUrl || undefined,
+			og_image_url: ogImage || undefined,
+			scheduled_publish_time: scheduledDateTimeString,
+			tags: apiTags,
+		};
+
 		try {
-			// In a real app, this would be an API call with the scheduled date/time
-			// For scheduled posts, we would include the scheduledDate and scheduledTime
-			let publishData = {};
+			const response = await fetch(`/api/posts/${postId}`, {
+				method: 'PUT',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify(postData),
+			});
 
-			if (status === 'scheduled' && scheduledDate) {
-				const [hours, minutes] = scheduledTime.split(':').map(Number);
-				const scheduledDateTime = new Date(scheduledDate);
-				scheduledDateTime.setHours(hours, minutes, 0, 0);
-
-				publishData = {
-					scheduledPublishTime: scheduledDateTime.toISOString(),
-				};
+			if (!response.ok) {
+				const errorData = await response.json();
+				console.error('API Error:', errorData);
+				let errorMessage = 'Failed to update post.';
+				if (errorData.error) {
+					if (typeof errorData.error === 'object' && errorData.error._errors) {
+						errorMessage = errorData.error._errors.join(', ');
+					} else if (typeof errorData.error === 'string') {
+						errorMessage = errorData.error;
+					}
+				}
+				throw new Error(errorMessage);
 			}
 
-			await new Promise((resolve) => setTimeout(resolve, 1000));
+			const result = await response.json();
 
 			toast({
-				title: status === 'scheduled' ? 'Post scheduled' : 'Post updated',
-				description:
-					status === 'scheduled'
-						? `Your post has been scheduled for publication on ${format(
-								scheduledDate!,
-								'PPP'
-						  )} at ${scheduledTime}.`
-						: 'Your post has been updated successfully.',
+				title: 'Post updated',
+				description: `Your post "${title}" has been updated successfully.`,
 			});
 			router.push('/admin/posts');
-		} catch (error) {
+			router.refresh();
+		} catch (error: any) {
+			console.error('Submission Error:', error);
 			toast({
 				title: 'Error',
-				description: 'An error occurred while updating the post.',
+				description: error.message || 'An error occurred while updating the post.',
 				variant: 'destructive',
 			});
 		} finally {
@@ -265,22 +326,21 @@ function EditPostPage({ params }: { params: { id: string } }) {
 	};
 
 	const generateSlug = () => {
-		setSlug(
-			title
-				.toLowerCase()
-				.replace(/[^\w\s]/gi, '')
-				.replace(/\s+/g, '-')
-		);
+		setSlug(generateSlugUtil(title));
 	};
 
-	const handleSelectCoverImage = (imageUrl: string) => {
+	const handleSelectCoverImage = (imageUrl: string, altTextProvided: string) => {
 		setCoverImage(imageUrl);
-		setGalleryOpen(false);
+		setCoverImageAltText(altTextProvided || '');
+		if (!ogImage) {
+			setOgImage(imageUrl);
+		}
+		setIsCoverGalleryOpen(false);
 	};
 
-	const handleSelectOgImage = (imageUrl: string) => {
+	const handleSelectOgImage = (imageUrl: string, altTextProvided: string) => {
 		setOgImage(imageUrl);
-		setOgGalleryOpen(false);
+		setIsOgGalleryOpen(false);
 	};
 
 	const getFormattedScheduledDate = () => {
@@ -290,10 +350,23 @@ function EditPostPage({ params }: { params: { id: string } }) {
 
 	if (isLoading) {
 		return (
-			<div className="flex h-[50vh] items-center justify-center">
+			<div className="flex h-[80vh] items-center justify-center">
 				<div className="flex flex-col items-center gap-2">
 					<Loader2 className="h-8 w-8 animate-spin text-primary" />
-					<p className="text-sm text-muted-foreground">Loading post...</p>
+					<p className="text-sm text-muted-foreground">Loading post editor...</p>
+				</div>
+			</div>
+		);
+	}
+
+	if (error) {
+		return (
+			<div className="flex h-[80vh] items-center justify-center">
+				<div className="flex flex-col items-center gap-3 text-center p-4">
+					<AlertCircle className="h-10 w-10 text-destructive" />
+					<h2 className="text-xl font-semibold">Error Loading Post</h2>
+					<p className="text-muted-foreground">{error}</p>
+					<Button onClick={() => router.push('/admin/posts')}>Go Back to Posts</Button>
 				</div>
 			</div>
 		);
@@ -320,10 +393,9 @@ function EditPostPage({ params }: { params: { id: string } }) {
 					<TabsList className="mb-6 w-full justify-start overflow-x-auto">
 						<TabsTrigger value="content">Content</TabsTrigger>
 						<TabsTrigger value="seo">SEO & Meta</TabsTrigger>
-						<TabsTrigger value="settings">Settings</TabsTrigger>
 					</TabsList>
 
-					<TabsContent value="content" className="space-y-6">
+					<TabsContent value="content" className="space-y-6 mt-0">
 						<div className="grid gap-6 md:grid-cols-3">
 							<div className="space-y-6 md:col-span-2">
 								<div className="space-y-2">
@@ -333,6 +405,7 @@ function EditPostPage({ params }: { params: { id: string } }) {
 										placeholder="Enter post title"
 										value={title}
 										onChange={(e) => setTitle(e.target.value)}
+										onBlur={generateSlug}
 										required
 									/>
 								</div>
@@ -342,7 +415,7 @@ function EditPostPage({ params }: { params: { id: string } }) {
 									<div className="flex items-center gap-2">
 										<Input
 											id="slug"
-											placeholder="enter-post-slug"
+											placeholder="post-slug-generated-here"
 											value={slug}
 											onChange={(e) => setSlug(e.target.value)}
 											required
@@ -363,10 +436,9 @@ function EditPostPage({ params }: { params: { id: string } }) {
 									<Label htmlFor="excerpt">Excerpt</Label>
 									<Textarea
 										id="excerpt"
-										placeholder="Brief description of the post"
+										placeholder="Brief description of the post (used in summaries and SEO)"
 										value={excerpt}
 										onChange={(e) => setExcerpt(e.target.value)}
-										required
 										className="min-h-[100px]"
 									/>
 								</div>
@@ -385,21 +457,26 @@ function EditPostPage({ params }: { params: { id: string } }) {
 								<Card>
 									<CardContent className="p-4">
 										<div className="space-y-2">
-											<Label htmlFor="featured-image">Featured Image</Label>
+											<Label htmlFor="cover-image">Cover Image</Label>
 											<div className="flex flex-col gap-4">
 												{coverImage ? (
 													<div className="relative aspect-video w-full overflow-hidden rounded-lg border">
 														<Image
-															src={coverImage || '/placeholder.svg'}
-															alt="Featured image"
+															src={coverImage}
+															alt={coverImageAltText || 'Cover image'}
 															fill
+															sizes="(max-width: 768px) 100vw, 33vw"
 															className="object-cover"
 														/>
 														<Button
 															variant="destructive"
 															size="icon"
-															className="absolute top-2 right-2"
-															onClick={() => setCoverImage('')}
+															className="absolute top-2 right-2 z-10"
+															aria-label="Remove cover image"
+															onClick={() => {
+																setCoverImage(null);
+																setCoverImageAltText('');
+															}}
 														>
 															<Trash className="h-4 w-4" />
 														</Button>
@@ -409,15 +486,26 @@ function EditPostPage({ params }: { params: { id: string } }) {
 														<div className="flex flex-col items-center gap-1 text-center">
 															<ImageIcon className="h-8 w-8 text-muted-foreground" />
 															<p className="text-sm text-muted-foreground">
-																No featured image selected
+																No cover image selected
 															</p>
 														</div>
+													</div>
+												)}
+												{coverImage && (
+													<div className='space-y-1'>
+														<Label htmlFor="cover-image-alt" className='text-xs'>Alt Text</Label>
+														<Input
+															id="cover-image-alt"
+															placeholder="Describe the cover image"
+															value={coverImageAltText}
+															onChange={(e) => setCoverImageAltText(e.target.value)}
+														/>
 													</div>
 												)}
 												<Button
 													type="button"
 													variant="outline"
-													onClick={() => setGalleryOpen(true)}
+													onClick={() => setIsCoverGalleryOpen(true)}
 												>
 													{coverImage ? 'Change Image' : 'Select Image'}
 												</Button>
@@ -430,7 +518,7 @@ function EditPostPage({ params }: { params: { id: string } }) {
 									<CardContent className="p-4 space-y-4">
 										<div className="space-y-2">
 											<Label htmlFor="status">Status</Label>
-											<Select value={status} onValueChange={setStatus}>
+											<Select value={status} onValueChange={(value) => setStatus(value as 'draft' | 'published' | 'scheduled')}>
 												<SelectTrigger>
 													<SelectValue placeholder="Select status" />
 												</SelectTrigger>
@@ -445,7 +533,7 @@ function EditPostPage({ params }: { params: { id: string } }) {
 										{status === 'scheduled' && (
 											<div className="space-y-2 border rounded-md p-3 bg-muted/30">
 												<div className="flex items-center justify-between">
-													<Label htmlFor="scheduledDate">
+													<Label htmlFor="scheduledDate" className='text-sm font-medium'>
 														Publication Date
 													</Label>
 													{scheduledDate && (
@@ -460,8 +548,9 @@ function EditPostPage({ params }: { params: { id: string } }) {
 														<PopoverTrigger asChild>
 															<Button
 																variant="outline"
+																aria-label='Select publication date'
 																className={cn(
-																	'justify-start text-left font-normal',
+																	'w-full justify-start text-left font-normal',
 																	!scheduledDate && 'text-muted-foreground'
 																)}
 															>
@@ -474,77 +563,61 @@ function EditPostPage({ params }: { params: { id: string } }) {
 																mode="single"
 																selected={scheduledDate}
 																onSelect={setScheduledDate}
+																disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
 																initialFocus
-																disabled={(date) => date < new Date()}
 															/>
 														</PopoverContent>
 													</Popover>
-
-													<div className="relative">
-														<Input
-															type="time"
-															value={scheduledTime}
-															onChange={handleTimeChange}
-															className="pl-10"
-														/>
-														<Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-													</div>
+													<Input
+														type="time"
+														aria-label="Select publication time"
+														value={scheduledTime}
+														onChange={handleTimeChange}
+														className="col-span-1"
+													/>
 												</div>
-
 												{scheduledError && (
 													<p className="text-xs text-red-500">
 														{scheduledError}
 													</p>
 												)}
-
-												<p className="text-xs text-muted-foreground">
-													Your post will be automatically published at the
-													scheduled date and time.
-												</p>
 											</div>
 										)}
+									</CardContent>
+								</Card>
 
+								<Card>
+									<CardContent className="p-4 space-y-4">
 										<div className="space-y-2">
-											<Label htmlFor="readTime">Read Time</Label>
-											<div className="relative">
-												<div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-													<Clock className="h-4 w-4 text-muted-foreground" />
-												</div>
-												<Input
-													id="readTime"
-													placeholder="5 min read"
-													value={readTime}
-													onChange={handleReadTimeChange}
-													className={cn(
-														'pl-10',
-														readTimeError
-															? 'border-red-500 focus-visible:ring-red-500'
-															: ''
-													)}
+											<Label htmlFor="tags">Tags</Label>
+											{tagOptions.length === 0 && !isLoading ? (
+												<p className="text-sm text-muted-foreground">No tags available.</p>
+											) : (
+												<MultiSelect
+													options={tagOptions}
+													selected={selectedTags}
+													onChange={setSelectedTags}
+													placeholder="Select or create tags..."
+													creatable={true}
 												/>
-											</div>
-											{readTimeError && (
-												<p className="text-xs text-red-500">
-													Please use the format "5 min read" or "2 hours read"
-												</p>
 											)}
-											<p className="text-xs text-muted-foreground">
-												Format: "5 min read" or "1 hours read"
-											</p>
 										</div>
 
 										<div className="space-y-2">
-											<Label htmlFor="tags">Tags</Label>
-											<MultiSelect
-												options={tagOptions}
-												selected={tags}
-												onChange={setTags}
-												placeholder="Select or create tags..."
-												creatable={true}
+											<Label htmlFor="readTime">Read Time</Label>
+											<Input
+												id="readTime"
+												placeholder="e.g., 5 min read"
+												value={readTime}
+												onChange={handleReadTimeChange}
+												onBlur={() => validateReadTime(readTime)}
+												className={cn(readTimeError ? 'border-red-500 focus-visible:ring-red-500' : '')}
 											/>
-											<p className="text-xs text-muted-foreground">
-												Select from existing tags or create new ones
-											</p>
+											{readTimeError && (
+												<p className="text-xs text-red-500">
+													Invalid format. Use 'X min read' or 'X hours read'.
+												</p>
+											)}
 										</div>
 									</CardContent>
 								</Card>
@@ -553,315 +626,148 @@ function EditPostPage({ params }: { params: { id: string } }) {
 					</TabsContent>
 
 					<TabsContent value="seo" className="space-y-6">
-						<div className="grid gap-6 md:grid-cols-3">
-							<div className="space-y-6 md:col-span-2">
+						<div className="grid gap-6 md:grid-cols-2">
+							<div className="space-y-4">
 								<div className="space-y-2">
-									<div className="flex items-center gap-2">
-										<Label htmlFor="metaTitle">Meta Title</Label>
-										<div className="text-xs text-muted-foreground">
-											(Recommended: 50-60 characters)
-										</div>
-									</div>
+									<Label htmlFor="metaTitle">Meta Title</Label>
 									<Input
 										id="metaTitle"
-										placeholder="SEO optimized title"
+										placeholder="Enter meta title (keep it concise)"
 										value={metaTitle}
 										onChange={(e) => setMetaTitle(e.target.value)}
 									/>
-									<div className="text-xs text-muted-foreground text-right">
-										{metaTitle.length}/60 characters
-									</div>
+									<p className="text-xs text-muted-foreground">Recommended: 50-60 characters. Currently: {metaTitle.length}</p>
 								</div>
 
 								<div className="space-y-2">
-									<div className="flex items-center gap-2">
-										<Label htmlFor="metaDescription">Meta Description</Label>
-										<div className="text-xs text-muted-foreground">
-											(Recommended: 150-160 characters)
-										</div>
-									</div>
+									<Label htmlFor="metaDescription">Meta Description</Label>
 									<Textarea
 										id="metaDescription"
-										placeholder="Brief SEO description for search engines"
+										placeholder="Enter meta description (summary for search engines)"
 										value={metaDescription}
 										onChange={(e) => setMetaDescription(e.target.value)}
 										className="min-h-[100px]"
 									/>
-									<div className="text-xs text-muted-foreground text-right">
-										{metaDescription.length}/160 characters
-									</div>
+									<p className="text-xs text-muted-foreground">Recommended: 150-160 characters. Currently: {metaDescription.length}</p>
 								</div>
 
 								<div className="space-y-2">
 									<Label htmlFor="keywords">Keywords</Label>
 									<Input
 										id="keywords"
-										placeholder="SEO keywords (comma separated)"
+										placeholder="Enter keywords (comma separated)"
 										value={keywords}
 										onChange={(e) => setKeywords(e.target.value)}
 									/>
 								</div>
 
 								<div className="space-y-2">
-									<div className="flex items-center gap-2">
-										<Label htmlFor="canonicalUrl">Canonical URL</Label>
-										<Link2 className="h-4 w-4 text-muted-foreground" />
-									</div>
+									<Label htmlFor="canonicalUrl">Canonical URL</Label>
 									<Input
 										id="canonicalUrl"
-										placeholder="https://example.com/canonical-page"
+										type='url'
+										placeholder="https://yourdomain.com/original-post-url"
 										value={canonicalUrl}
 										onChange={(e) => setCanonicalUrl(e.target.value)}
 									/>
+									<p className="text-xs text-muted-foreground">Use if this content is duplicated from another source.</p>
 								</div>
 							</div>
 
-							<div className="space-y-6">
-								<Card>
-									<CardContent className="p-4 space-y-4">
-										<div className="flex items-center gap-2">
-											<Globe className="h-4 w-4" />
-											<h3 className="font-medium">Social Media Preview</h3>
-										</div>
+							<div className="space-y-4">
+								<div className="space-y-2">
+									<Label htmlFor="ogTitle">Open Graph Title</Label>
+									<Input
+										id="ogTitle"
+										placeholder="Enter OG title (for social media sharing)"
+										value={ogTitle}
+										onChange={(e) => setOgTitle(e.target.value)}
+									/>
+									<p className="text-xs text-muted-foreground">If empty, defaults to Meta Title or Post Title.</p>
+								</div>
 
-										<div className="space-y-2">
-											<Label htmlFor="ogTitle">OG Title</Label>
-											<Input
-												id="ogTitle"
-												placeholder="Title for social media"
-												value={ogTitle}
-												onChange={(e) => setOgTitle(e.target.value)}
-											/>
-										</div>
+								<div className="space-y-2">
+									<Label htmlFor="ogDescription">Open Graph Description</Label>
+									<Textarea
+										id="ogDescription"
+										placeholder="Enter OG description (for social media sharing)"
+										value={ogDescription}
+										onChange={(e) => setOgDescription(e.target.value)}
+										className="min-h-[100px]"
+									/>
+									<p className="text-xs text-muted-foreground">If empty, defaults to Meta Description or Excerpt.</p>
+								</div>
 
-										<div className="space-y-2">
-											<Label htmlFor="ogDescription">OG Description</Label>
-											<Textarea
-												id="ogDescription"
-												placeholder="Description for social media"
-												value={ogDescription}
-												onChange={(e) => setOgDescription(e.target.value)}
-											/>
-										</div>
-
-										<div className="space-y-2">
-											<Label>OG Image</Label>
-											<div
-												className="relative aspect-[1.91/1] overflow-hidden rounded-md border border-dashed border-muted-foreground/25 cursor-pointer"
-												onClick={() => setOgGalleryOpen(true)}
-											>
-												<img
-													src={ogImage || '/placeholder.svg'}
-													alt="OG Image"
-													className="h-full w-full object-cover"
+								<div className="space-y-2">
+									<Label htmlFor="ogImage">Open Graph Image</Label>
+									<div className="flex flex-col gap-2">
+										{ogImage ? (
+											<div className="relative aspect-[1.91/1] w-full overflow-hidden rounded-lg border">
+												<Image
+													src={ogImage}
+													alt="Open Graph Image Preview"
+													fill
+													sizes="(max-width: 768px) 100vw, 50vw"
+													className="object-cover"
 												/>
-												<div className="absolute inset-0 flex items-center justify-center bg-black/5 transition-opacity hover:bg-black/10">
-													<Button
-														variant="secondary"
-														size="sm"
-														className="gap-1.5"
-													>
-														<ImageIcon className="h-4 w-4" />
-														{!ogImage ? 'Add OG Image' : 'Change Image'}
-													</Button>
+												<Button
+													variant="destructive"
+													size="icon"
+													className="absolute top-2 right-2 z-10"
+													aria-label="Remove OG image"
+													onClick={() => setOgImage(null)}
+												>
+													<Trash className="h-4 w-4" />
+												</Button>
+											</div>
+										) : (
+											<div className="flex aspect-[1.91/1] w-full items-center justify-center rounded-lg border border-dashed">
+												<div className="flex flex-col items-center gap-1 text-center">
+													<ImageIcon className="h-8 w-8 text-muted-foreground" />
+													<p className="text-sm text-muted-foreground">
+														No OG image selected
+													</p>
 												</div>
 											</div>
-											<p className="text-xs text-muted-foreground">
-												Recommended size: 1200x630 pixels
-											</p>
-										</div>
-									</CardContent>
-								</Card>
-
-								<Card>
-									<CardContent className="p-4">
-										<div className="flex items-center gap-2 mb-3">
-											<Info className="h-4 w-4 text-blue-500" />
-											<h3 className="font-medium">SEO Tips</h3>
-										</div>
-										<ul className="text-xs space-y-2 text-muted-foreground">
-											<li>
-												• Use keywords naturally in your title and description
-											</li>
-											<li>• Keep meta titles under 60 characters</li>
-											<li>• Keep meta descriptions under 160 characters</li>
-											<li>• Use unique, descriptive titles for each page</li>
-											<li>
-												• Include a call-to-action in your meta description
-											</li>
-										</ul>
-									</CardContent>
-								</Card>
+										)}
+										<Button
+											type="button"
+											variant="outline"
+											onClick={() => setIsOgGalleryOpen(true)}
+										>
+											{ogImage ? 'Change OG Image' : 'Select OG Image'}
+										</Button>
+									</div>
+									<p className="text-xs text-muted-foreground">
+										Recommended size: 1200x630 pixels. If empty, defaults to Cover Image.
+									</p>
+								</div>
 							</div>
-						</div>
-					</TabsContent>
-
-					<TabsContent value="settings" className="space-y-6">
-						<div className="grid gap-6 md:grid-cols-2">
-							<Card>
-								<CardContent className="p-4 space-y-4">
-									<h3 className="font-medium">Publishing Settings</h3>
-
-									<div className="space-y-2">
-										<Label htmlFor="status">Status</Label>
-										<Select value={status} onValueChange={setStatus}>
-											<SelectTrigger>
-												<SelectValue placeholder="Select status" />
-											</SelectTrigger>
-											<SelectContent>
-												<SelectItem value="published">Published</SelectItem>
-												<SelectItem value="draft">Draft</SelectItem>
-												<SelectItem value="scheduled">Scheduled</SelectItem>
-											</SelectContent>
-										</Select>
-									</div>
-
-									{status === 'scheduled' && (
-										<div className="space-y-2 border rounded-md p-3 bg-muted/30">
-											<div className="flex items-center justify-between">
-												<Label htmlFor="scheduledDate">
-													Publication Date & Time
-												</Label>
-												{scheduledDate && (
-													<Badge variant="outline" className="ml-2">
-														Scheduled
-													</Badge>
-												)}
-											</div>
-
-											<div className="grid grid-cols-2 gap-2">
-												<Popover>
-													<PopoverTrigger asChild>
-														<Button
-															variant="outline"
-															className={cn(
-																'justify-start text-left font-normal',
-																!scheduledDate && 'text-muted-foreground'
-															)}
-														>
-															<Calendar className="mr-2 h-4 w-4" />
-															{getFormattedScheduledDate()}
-														</Button>
-													</PopoverTrigger>
-													<PopoverContent className="w-auto p-0">
-														<CalendarComponent
-															mode="single"
-															selected={scheduledDate}
-															onSelect={setScheduledDate}
-															initialFocus
-															disabled={(date) => date < new Date()}
-														/>
-													</PopoverContent>
-												</Popover>
-
-												<div className="relative">
-													<Input
-														type="time"
-														value={scheduledTime}
-														onChange={handleTimeChange}
-														className="pl-10"
-													/>
-													<Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-												</div>
-											</div>
-
-											{scheduledError && (
-												<p className="text-xs text-red-500">{scheduledError}</p>
-											)}
-
-											<p className="text-xs text-muted-foreground">
-												Your post will be automatically published at the
-												scheduled date and time.
-											</p>
-										</div>
-									)}
-
-									<div className="space-y-2">
-										<Label htmlFor="author">Author</Label>
-										<Select defaultValue="current">
-											<SelectTrigger>
-												<SelectValue placeholder="Select author" />
-											</SelectTrigger>
-											<SelectContent>
-												<SelectItem value="current">Current User</SelectItem>
-												<SelectItem value="admin">Admin</SelectItem>
-												<SelectItem value="editor">Editor</SelectItem>
-											</SelectContent>
-										</Select>
-									</div>
-								</CardContent>
-							</Card>
-
-							<Card>
-								<CardContent className="p-4 space-y-4">
-									<h3 className="font-medium">Categories</h3>
-
-									<div className="space-y-2">
-										<Label htmlFor="category">Primary Category</Label>
-										<Select defaultValue="uncategorized">
-											<SelectTrigger>
-												<SelectValue placeholder="Select category" />
-											</SelectTrigger>
-											<SelectContent>
-												<SelectItem value="uncategorized">
-													Uncategorized
-												</SelectItem>
-												<SelectItem value="technology">Technology</SelectItem>
-												<SelectItem value="design">Design</SelectItem>
-												<SelectItem value="development">Development</SelectItem>
-												<SelectItem value="business">Business</SelectItem>
-											</SelectContent>
-										</Select>
-									</div>
-
-									<div className="space-y-2">
-										<div className="flex items-center gap-2">
-											<Label htmlFor="tags">Tags</Label>
-											<Tag className="h-4 w-4 text-muted-foreground" />
-										</div>
-										<MultiSelect
-											options={tagOptions}
-											selected={tags}
-											onChange={setTags}
-											placeholder="Select or create tags..."
-											creatable={true}
-										/>
-										<p className="text-xs text-muted-foreground">
-											Select from existing tags or create new ones
-										</p>
-									</div>
-								</CardContent>
-							</Card>
 						</div>
 					</TabsContent>
 				</Tabs>
 
-				<div className="flex flex-wrap gap-2">
-					<Button type="submit" disabled={isSubmitting}>
-						{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-						{status === 'published'
-							? 'Update & Publish'
-							: status === 'scheduled'
-							? 'Update Schedule'
-							: 'Save as Draft'}
-					</Button>
-					<Button type="button" variant="outline" onClick={() => router.back()}>
+				<div className="flex justify-end gap-4 sticky bottom-0 bg-background py-4 border-t -mx-4 px-4 md:-mx-6 md:px-6">
+					<Button type="button" variant="outline" onClick={() => router.back()} disabled={isSubmitting}>
 						Cancel
+					</Button>
+					<Button type="submit" disabled={isSubmitting || isLoading}>
+						{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+						Update Post
 					</Button>
 				</div>
 			</form>
 
-			{/* Image Gallery Pickers */}
 			<ImageGalleryPicker
-				open={galleryOpen}
-				onOpenChange={setGalleryOpen}
+				open={isCoverGalleryOpen}
+				onOpenChange={setIsCoverGalleryOpen}
 				onSelectImage={handleSelectCoverImage}
 				isPostImageUpload={true}
 			/>
 
 			<ImageGalleryPicker
-				open={ogGalleryOpen}
-				onOpenChange={setOgGalleryOpen}
+				open={isOgGalleryOpen}
+				onOpenChange={setIsOgGalleryOpen}
 				onSelectImage={handleSelectOgImage}
 			/>
 		</div>

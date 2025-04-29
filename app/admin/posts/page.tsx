@@ -147,16 +147,79 @@ function PostsPage() {
 		setDeleteDialogOpen(true);
 	};
 
-	const confirmDelete = () => {
+	const confirmDelete = async () => {
 		if (postToDelete) {
-			// In a real app, this would be an API call
-			setPosts(posts.filter((post) => post.id !== postToDelete));
-			toast({
-				title: 'Post deleted',
-				description: 'The post has been successfully deleted.',
+			try {
+				const response = await fetch(`/api/posts/${postToDelete}`, {
+					method: 'DELETE',
+					// No headers needed based on the DELETE route logic
+				});
+
+				if (!response.ok) {
+					const errorData = await response.json();
+					throw new Error(errorData.error || 'Failed to delete post.');
+				}
+
+				toast({
+					title: 'Post deleted',
+					description: 'The post has been successfully deleted.',
+				});
+
+				// Refetch posts after deletion
+				await fetchPosts();
+
+			} catch (error: any) {
+				console.error('Error deleting post:', error);
+				toast({
+					title: 'Error',
+					description: error.message || 'Could not delete post.',
+					variant: 'destructive',
+				});
+			} finally {
+				setDeleteDialogOpen(false);
+				setPostToDelete(null);
+			}
+		}
+	};
+
+	const handleStatusChange = async (postId: string, newStatus: 'published' | 'draft') => {
+		// Optimistically update the UI
+		const originalPosts = [...posts];
+		setPosts(prevPosts => 
+			prevPosts.map(p => p.id === postId ? { ...p, status: newStatus } : p)
+		);
+
+		try {
+			const response = await fetch(`/api/posts/${postId}`, {
+				method: 'PUT',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({ status: newStatus }),
 			});
-			setDeleteDialogOpen(false);
-			setPostToDelete(null);
+
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.error || 'Failed to update status.');
+			}
+
+			toast({
+				title: 'Status Updated',
+				description: `Post status changed to ${newStatus}.`,
+			});
+
+			// Optional: Refetch if needed, though optimistic update might suffice
+			// await fetchPosts();
+
+		} catch (error: any) {
+			console.error('Error updating status:', error);
+			// Revert optimistic update on error
+			setPosts(originalPosts);
+			toast({
+				title: 'Error',
+				description: error.message || 'Could not update post status.',
+				variant: 'destructive',
+			});
 		}
 	};
 
@@ -373,13 +436,14 @@ function PostsPage() {
 												</TableCell>
 												<TableCell className="hidden sm:table-cell">
 													<div className="text-sm text-muted-foreground">
-														{post.publishedAt}
+														{post.published_at ? new Date(post.published_at).toLocaleDateString() : 'N/A'}
 													</div>
 												</TableCell>
 												<TableCell>
 													<PostActions
 														post={post}
 														onDelete={() => handleDeletePost(post.id)}
+														onStatusChange={handleStatusChange}
 													/>
 												</TableCell>
 											</TableRow>

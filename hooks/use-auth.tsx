@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState, ComponentType } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 
 
@@ -114,13 +114,12 @@ export function useAuth() {
 	return { isAuthenticated, profile, isLoading, logout };
 }
 
-export function withAuth(Component: React.ComponentType) {
-	return function AuthenticatedComponent(props: any) {
+export function withAuth<P extends object>(Component: ComponentType<P>) {
+	return function AuthenticatedComponent(props: P) {
 		const { isAuthenticated, isLoading } = useAuth();
 		const router = useRouter();
 		const pathname = usePathname();
 
-		// Skip authentication check for the login page
 		const isLoginPage = pathname === '/admin/login';
 
 		useEffect(() => {
@@ -132,7 +131,7 @@ export function withAuth(Component: React.ComponentType) {
 		if (isLoading) {
 			return (
 				<div className="flex items-center justify-center min-h-screen">
-					Loading...
+					Authenticating...
 				</div>
 			);
 		}
