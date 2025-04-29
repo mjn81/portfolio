@@ -1,6 +1,7 @@
 'use client';
 
 import { cn, checkReadTimeFormat } from '@/lib/utils';
+import type { Tag } from '@/types/tag'; // Assuming Tag type exists
 
 import type React from 'react';
 
@@ -35,6 +36,12 @@ import { Badge } from '@/components/ui/badge';
 import { ImageGalleryPicker } from '@/components/admin/image-gallery-picker';
 import Image from 'next/image';
 
+// Define structure for MultiSelect options
+interface TagOption {
+	value: string; // Use tag ID or name for value
+	label: string; // Use tag name for label
+}
+
 function CreatePostPage() {
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [title, setTitle] = useState('');
@@ -45,7 +52,7 @@ function CreatePostPage() {
 		'/placeholder.svg?height=400&width=600'
 	);
 	const [status, setStatus] = useState('draft');
-	const [tags, setTags] = useState<string[]>([]);
+	const [selectedTags, setSelectedTags] = useState<string[]>([]); // Store selected tag values (IDs or names)
 	const [readTime, setReadTime] = useState('');
 	const [readTimeError, setReadTimeError] = useState(false);
 	const [scheduledDate, setScheduledDate] = useState<Date | undefined>(
@@ -68,24 +75,46 @@ function CreatePostPage() {
 		'/placeholder.svg?height=630&width=1200'
 	);
 
+	// State for tags data
+	const [allTags, setAllTags] = useState<Tag[]>([]); // Store raw tag data from API
+	const [tagOptions, setTagOptions] = useState<TagOption[]>([]); // Options for MultiSelect
+	const [isTagsLoading, setIsTagsLoading] = useState(true);
+	const [tagsError, setTagsError] = useState<string | null>(null);
+
 	const router = useRouter();
 	const { toast } = useToast();
 
-	// Available tag options
-	const tagOptions = [
-		{ value: 'nextjs', label: 'Next.js' },
-		{ value: 'react', label: 'React' },
-		{ value: 'javascript', label: 'JavaScript' },
-		{ value: 'typescript', label: 'TypeScript' },
-		{ value: 'tutorial', label: 'Tutorial' },
-		{ value: 'design', label: 'Design' },
-		{ value: 'ui', label: 'UI' },
-		{ value: 'ux', label: 'UX' },
-		{ value: 'frontend', label: 'Frontend' },
-		{ value: 'backend', label: 'Backend' },
-		{ value: 'fullstack', label: 'Full Stack' },
-		{ value: 'development', label: 'Development' },
-	];
+	// Fetch tags from API
+	useEffect(() => {
+		const fetchTags = async () => {
+			setIsTagsLoading(true);
+			setTagsError(null);
+			try {
+				const response = await fetch('/api/tags');
+				if (!response.ok) {
+					throw new Error('Failed to fetch tags');
+				}
+				const data: Tag[] = await response.json();
+				setAllTags(data);
+				// Transform fetched tags for MultiSelect
+				setTagOptions(
+					data.map((tag) => ({ value: tag.id, label: tag.name })) // Use ID as value
+				);
+			} catch (error: any) {
+				console.error('Error fetching tags:', error);
+				setTagsError(error.message || 'Could not load tags.');
+				toast({
+					title: 'Error loading tags',
+					description: error.message || 'Could not load tags.',
+					variant: 'destructive',
+				});
+			} finally {
+				setIsTagsLoading(false);
+			}
+		};
+
+		fetchTags();
+	}, [toast]); // Added toast dependency
 
 	// Effect to handle status change
 	useEffect(() => {
@@ -167,38 +196,85 @@ function CreatePostPage() {
 
 		setIsSubmitting(true);
 
+		let scheduledDateTimeString: string | undefined = undefined;
+		if (status === 'scheduled' && scheduledDate) {
+			const [hours, minutes] = scheduledTime.split(':').map(Number);
+			const scheduledDateTime = new Date(scheduledDate);
+			scheduledDateTime.setHours(hours, minutes, 0, 0);
+			scheduledDateTimeString = scheduledDateTime.toISOString();
+		}
+
+		// Map selected tag values back to the format expected by the API
+		const apiTags = selectedTags.map((tagValue) => {
+			// Check if the value corresponds to an existing tag ID
+			const existingTag = allTags.find((t) => t.id === tagValue);
+			if (existingTag) {
+				// Existing tag, send ID and name
+				return { id: existingTag.id, name: existingTag.name };
+			} else {
+				// New tag created via MultiSelect (value is the name)
+				// The API should handle creating this new tag based on name
+				return { name: tagValue }; 
+			}
+		});
+
+		const postData = {
+			title,
+			slug,
+			excerpt,
+			content, // Assuming RichTextEditor provides HTML string
+			image: featuredImage, // Use featuredImage state
+			read_time: readTime || undefined,
+			status,
+			meta_title: metaTitle || undefined,
+			meta_description: metaDescription || undefined,
+			og_title: ogTitle || undefined,
+			og_description: ogDescription || undefined,
+			seo_keywords: keywords || undefined,
+			seo_canonical_url: canonicalUrl || undefined,
+			og_image_url:
+				ogImage === '/placeholder.svg?height=630&width=1200'
+					? undefined
+					: ogImage,
+			// author: 'user_id', // TODO: Get logged-in user ID
+			scheduledPublishTime: scheduledDateTimeString,
+			tags: apiTags, // Use the correctly formatted tags
+		};
+
 		try {
-			// In a real app, this would be an API call with the scheduled date/time
-			// For scheduled posts, we would include the scheduledDate and scheduledTime
-			let publishData = {};
+			const response = await fetch('/api/posts', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify(postData),
+			});
 
-			if (status === 'scheduled' && scheduledDate) {
-				const [hours, minutes] = scheduledTime.split(':').map(Number);
-				const scheduledDateTime = new Date(scheduledDate);
-				scheduledDateTime.setHours(hours, minutes, 0, 0);
-
-				publishData = {
-					scheduledPublishTime: scheduledDateTime.toISOString(),
-				};
+			if (!response.ok) {
+				const errorData = await response.json();
+				console.error('API Error:', errorData);
+				throw new Error(
+					errorData.error?.message ||
+						`Failed to create post: ${response.statusText}`
+				);
 			}
 
-			await new Promise((resolve) => setTimeout(resolve, 1000));
+			const result = await response.json();
 
 			toast({
 				title: status === 'scheduled' ? 'Post scheduled' : 'Post created',
 				description:
 					status === 'scheduled'
-						? `Your post has been scheduled for publication on ${format(
-								scheduledDate!,
-								'PPP'
-						  )} at ${scheduledTime}.`
-						: 'Your post has been created successfully.',
+						? `Your post "${title}" has been scheduled for publication.`
+						: `Your post "${title}" has been created successfully.`,
 			});
-			router.push('/admin/posts');
-		} catch (error) {
+			router.push('/admin/posts'); // Redirect after successful creation
+		} catch (error: any) {
+			console.error('Submission Error:', error);
 			toast({
 				title: 'Error',
-				description: 'An error occurred while creating the post.',
+				description:
+					error.message || 'An error occurred while creating the post.',
 				variant: 'destructive',
 			});
 		} finally {
@@ -227,6 +303,11 @@ function CreatePostPage() {
 	const handleSelectFeaturedImage = (imageUrl: string) => {
 		setFeaturedImage(imageUrl);
 		setIsGalleryOpen(false);
+	};
+
+	const handleSelectOgImage = (imageUrl: string) => {
+		setOgImage(imageUrl);
+		setGalleryOpen(false); // Close the main gallery used for OG image
 	};
 
 	const getFormattedScheduledDate = () => {
@@ -439,13 +520,19 @@ function CreatePostPage() {
 									<CardContent className="p-4 space-y-4">
 										<div className="space-y-2">
 											<Label htmlFor="tags">Tags</Label>
-											<MultiSelect
-												options={tagOptions}
-												selected={tags}
-												onChange={setTags}
-												placeholder="Select or create tags..."
-												creatable={true}
-											/>
+											{isTagsLoading ? (
+												<p className="text-sm text-muted-foreground">Loading tags...</p>
+											) : tagsError ? (
+												<p className="text-sm text-red-500">{tagsError}</p>
+											) : (
+												<MultiSelect
+													options={tagOptions}
+													selected={selectedTags} // Pass string array of values
+													onChange={setSelectedTags} // Directly use the setter
+													placeholder="Select or create tags..."
+													creatable={true}
+												/>
+											)}
 										</div>
 
 										<div className="space-y-2">
@@ -585,7 +672,7 @@ function CreatePostPage() {
 			<ImageGalleryPicker
 				open={galleryOpen}
 				onOpenChange={setGalleryOpen}
-				onSelectImage={handleSelectImage}
+				onSelectImage={handleSelectOgImage}
 			/>
 			<ImageGalleryPicker
 				open={isGalleryOpen}
