@@ -83,14 +83,28 @@ export async function GET(request: NextRequest) {
 		}
 
 		// Determine the next cursor
-		const nextCursor =
-			updatedMediaRecords.length > limit
-				? updatedMediaRecords[updatedMediaRecords.length - 1].uploaded_at
-				: null;
+		let nextCursorValue: string | null = null;
+		if (updatedMediaRecords.length > limit) {
+			// Get the (limit+1)th record to determine the cursor for the next page
+			const lastRecordForCursor = updatedMediaRecords[limit];
+			if (lastRecordForCursor && lastRecordForCursor.uploaded_at) {
+				try {
+					// Ensure the outgoing cursor value is a valid ISO string
+					nextCursorValue = new Date(lastRecordForCursor.uploaded_at).toISOString();
+				} catch (dateError) {
+					console.error("Error formatting nextCursor from:", lastRecordForCursor.uploaded_at, dateError);
+					// If formatting fails, don't send a cursor to avoid errors
+					nextCursorValue = null;
+				}
+			}
+		}
 
-		
 		return NextResponse.json(
-			{ media: updatedMediaRecords, nextCursor },
+			{
+				// Slice the array *before* sending to only include 'limit' items
+				media: updatedMediaRecords.slice(0, limit),
+				nextCursor: nextCursorValue
+			},
 			{ status: 200 }
 		);
 	} catch (error) {

@@ -46,7 +46,7 @@ import {
 	AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/components/ui/use-toast';
-import type { Post } from '@/lib/mock-data';
+import type { Post } from '@/types/post';
 import { withAuth } from '@/hooks/use-auth';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -157,9 +157,6 @@ function PostsPage() {
 			});
 			setDeleteDialogOpen(false);
 			setPostToDelete(null);
-
-			// Refetch posts to update pagination
-			fetchPosts();
 		}
 	};
 
@@ -297,23 +294,6 @@ function PostsPage() {
 												)}
 											</div>
 										</TableHead>
-										<TableHead
-											className="hidden sm:table-cell text-center cursor-pointer"
-											onClick={() => handleSort('views')}
-										>
-											<div className="flex items-center justify-center">
-												Views
-												{sortConfig.key === 'views' && (
-													<ArrowUpDown
-														className={`ml-1 h-3 w-3 ${
-															sortConfig.direction === 'ascending'
-																? 'rotate-180'
-																: ''
-														}`}
-													/>
-												)}
-											</div>
-										</TableHead>
 										<TableHead className="text-right">Actions</TableHead>
 									</TableRow>
 								</TableHeader>
@@ -336,9 +316,6 @@ function PostsPage() {
 													<TableCell className="hidden sm:table-cell">
 														<Skeleton className="h-4 w-20" />
 													</TableCell>
-													<TableCell className="hidden sm:table-cell text-center">
-														<Skeleton className="h-4 w-12 mx-auto" />
-													</TableCell>
 													<TableCell className="text-right">
 														<div className="flex justify-end space-x-2">
 															<Skeleton className="h-8 w-8" />
@@ -347,9 +324,9 @@ function PostsPage() {
 													</TableCell>
 												</TableRow>
 											))
-									) : posts.length === 0 ? (
+									) : !posts || posts.length === 0 ? (
 										<TableRow>
-											<TableCell colSpan={5} className="h-24 text-center">
+											<TableCell colSpan={4} className="h-24 text-center">
 												No posts found.
 											</TableCell>
 										</TableRow>
@@ -397,11 +374,6 @@ function PostsPage() {
 												<TableCell className="hidden sm:table-cell">
 													<div className="text-sm text-muted-foreground">
 														{post.publishedAt}
-													</div>
-												</TableCell>
-												<TableCell className="hidden sm:table-cell text-center">
-													<div className="text-sm">
-														{post.views.toLocaleString()}
 													</div>
 												</TableCell>
 												<TableCell>

@@ -53,6 +53,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "@/components/ui/use-toast"
 import { Switch } from "@/components/ui/switch"
 import { MediaFile } from "@/types/file"
+import { Skeleton } from "@/components/ui/skeleton"
 
 const getFileIcon = (type: string) => {
 	switch (type) {
@@ -99,7 +100,7 @@ export default function MediaLibraryPage() {
   const fetchMedia = useCallback(async (cursor: string | null = null) => {
     try {
       setIsLoading(true)
-      const endpoint = `/api/media?${cursor ? `cursor=${cursor}&` : ''}limit=10`
+      const endpoint = `/api/media?${cursor ? `cursor=${cursor}&` : ''}limit=15`
 			
 			const response = await fetch(endpoint)
 
@@ -131,25 +132,29 @@ export default function MediaLibraryPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [mediaFiles.length])
+  }, [])
 
   // Initial load
   useEffect(() => {
     fetchMedia()
-  }, [])
+  }, [fetchMedia])
 
   // Setup intersection observer for infinite scroll
   useEffect(() => {
     if (isLoading || !hasMore) return
     
-    const observer = new IntersectionObserver(
-      entries => {
-        if (entries[0].isIntersecting && hasMore && !isLoading) {
-          fetchMedia(nextCursor)
-        }
-      },
-      { threshold: 0.5 }
-    )
+    const observerCallback = (entries: IntersectionObserverEntry[]) => {
+      if (entries[0].isIntersecting) {
+        console.log("Load more triggered by observer");
+        fetchMedia(nextCursor);
+      }
+    };
+
+    const observer = new IntersectionObserver(observerCallback, {
+      root: null,
+      rootMargin: '0px',
+      threshold: 0.5,
+    });
     
     const currentLoadMoreRef = loadMoreRef.current
     if (currentLoadMoreRef) {
@@ -163,7 +168,7 @@ export default function MediaLibraryPage() {
         observer.unobserve(currentLoadMoreRef)
       }
     }
-  }, [fetchMedia, hasMore, isLoading, nextCursor])
+  }, [isLoading, hasMore, nextCursor, fetchMedia])
 
   // Filter media files based on search term and active tab
   const filteredMedia = mediaFiles.filter((file) => {
@@ -773,7 +778,7 @@ export default function MediaLibraryPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-4">
+        <CardContent className="p-4 relative">
           {selectedFiles.length > 0 && (
             <div className="flex items-center justify-between mb-4 p-2 bg-muted rounded-lg">
               <div className="flex items-center gap-2">
@@ -789,157 +794,182 @@ export default function MediaLibraryPage() {
             </div>
           )}
 
-          {filteredMedia.length > 0 ? (
-            <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {filteredMedia.map((file) => (
-                  <Card key={file.id} className="overflow-hidden border">
-                    <div className="relative aspect-square group">
-                      {/* Checkbox for selection */}
-                      <div className="absolute top-2 left-2 z-10">
-                        <Checkbox
-                          checked={selectedFiles.includes(file.id)}
-                          onCheckedChange={() => handleFileSelect(file.id)}
-                          className="bg-background/90 border-background/90"
-                        />
-                      </div>
-                      {file.is_private && (
-                        <div className="absolute top-2 right-2 z-10 bg-background/90 rounded-full p-1">
-                          <Lock className="h-3 w-3 text-amber-500" />
-                        </div>
-                      )}
-                      {/* File preview */}
-                      <div className="relative h-full w-full bg-muted flex items-center justify-center overflow-hidden">
-                        {file.type === "image" ? (
-                          <Image
-                            src={file.url || "/placeholder.svg"}
-                            alt={file.name}
-                            fill
-                            className="object-cover transition-opacity group-hover:opacity-80"
-                          />
-                        ) : (
-                          <div className="absolute inset-0 flex items-center justify-center bg-muted">
-                            {getFileIcon(file.type)}
-                          </div>
-                        )}
-
-                        {/* Overlay with actions */}
-                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                          <Button
-                            variant="secondary"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => setMediaDetails(file)}
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="secondary"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => copyToClipboard(file.url)}
-                          >
-                            <LinkIcon className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="secondary"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => handleDelete([file.id])}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
+          {/* Initial Loading State */}
+          {isLoading && mediaFiles.length === 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {Array.from({ length: 8 }).map((_, index) => ( // Show 8 skeletons initially
+                <Card key={`skeleton-${index}`} className="overflow-hidden border">
+                  <Skeleton className="aspect-square w-full" />
+                  <CardFooter className="block px-2 py-2">
+                    <Skeleton className="h-4 w-3/4 mb-1" />
+                    <Skeleton className="h-3 w-1/2" />
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t">
+                      <Skeleton className="h-5 w-12" />
+                      <Skeleton className="h-5 w-16" />
                     </div>
-
-                    <CardFooter className="block px-2 py-2">
-                      <div className="flex items-center justify-between mb-1">
-                        <h3 className="text-sm font-medium truncate" title={file.name}>
-                          {file.name}
-                        </h3>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-6 w-6">
-                              <ChevronDown className="h-3 w-3" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => setMediaDetails(file)}>View details</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => copyToClipboard(file.url)}>
-                              Copy link
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>Download</DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={() => handleDelete([file.id])}
-                              className="text-destructive focus:text-destructive"
-                            >
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>{file.size}</span>
-                        <span>{file.uploadedAt}</span>
-                      </div>
-                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-border">
-                        <span className="text-xs flex items-center gap-1">
-                          {file.is_private ? (
-                            <span className="flex items-center text-amber-500">
-                              <Lock className="h-3 w-3 mr-1" />
-                              Private
-                            </span>
-                          ) : (
-                            <span className="flex items-center text-green-500">
-                              <Globe className="h-3 w-3 mr-1" />
-                              Public
-                            </span>
-                          )}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground">
-                            {file.is_private ? "Private" : "Public"}
-                          </span>
-                          <Switch
-                            checked={!file.is_private}
-                            onCheckedChange={() => toggleFileStatus(file.id)}
-                          />
-                        </div>
-                      </div>
-                    </CardFooter>
-                  </Card>
-                ))}
-              </div>
-              
-              {/* Load more indicator */}
-              <div 
-                ref={loadMoreRef} 
-                className="w-full py-8 flex justify-center"
-              >
-                {isLoading && hasMore && (
-                  <div className="flex flex-col items-center gap-2">
-                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                    <p className="text-sm text-muted-foreground">Loading more...</p>
-                  </div>
-                )}
-                {!hasMore && mediaFiles.length > 0 && (
-                  <p className="text-sm text-muted-foreground">No more files to load</p>
-                )}
-              </div>
-            </>
-          ) : (
-            <div className="py-20 text-center">
-              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-muted">
-                <ImageIcon className="h-10 w-10 text-muted-foreground" />
-              </div>
-              <h3 className="mt-4 text-lg font-semibold">No media found</h3>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {searchTerm ? "No results match your search" : "Upload some files to get started"}
-              </p>
+                  </CardFooter>
+                </Card>
+              ))}
             </div>
           )}
+
+          {/* Display Media Grid or No Results Message */}
+          {!isLoading || mediaFiles.length > 0 ? ( // Show grid if not initial loading OR if files are already loaded
+            filteredMedia.length > 0 ? (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {filteredMedia.map((file) => (
+                    <Card key={file.id} className="overflow-hidden border">
+                      <div className="relative aspect-square group">
+                        {/* Checkbox for selection */}
+                        <div className="absolute top-2 left-2 z-10">
+                          <Checkbox
+                            checked={selectedFiles.includes(file.id)}
+                            onCheckedChange={() => handleFileSelect(file.id)}
+                            className="bg-background/90 border-background/90"
+                          />
+                        </div>
+                        {file.is_private && (
+                          <div className="absolute top-2 right-2 z-10 bg-background/90 rounded-full p-1">
+                            <Lock className="h-3 w-3 text-amber-500" />
+                          </div>
+                        )}
+                        {/* File preview */}
+                        <div className="relative h-full w-full bg-muted flex items-center justify-center overflow-hidden">
+                          {file.type === "image" ? (
+                            <Image
+                              src={file.url || "/placeholder.svg"}
+                              alt={file.name}
+                              fill
+                              className="object-cover transition-opacity group-hover:opacity-80"
+                            />
+                          ) : (
+                            <div className="absolute inset-0 flex items-center justify-center bg-muted">
+                              {getFileIcon(file.type)}
+                            </div>
+                          )}
+
+                          {/* Overlay with actions */}
+                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                            <Button
+                              variant="secondary"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => setMediaDetails(file)}
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => copyToClipboard(file.url)}
+                            >
+                              <LinkIcon className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleDelete([file.id])}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <CardFooter className="block px-2 py-2">
+                        <div className="flex items-center justify-between mb-1">
+                          <h3 className="text-sm font-medium truncate" title={file.name}>
+                            {file.name}
+                          </h3>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-6 w-6">
+                                <ChevronDown className="h-3 w-3" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => setMediaDetails(file)}>View details</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => copyToClipboard(file.url)}>
+                                Copy link
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>Download</DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => handleDelete([file.id])}
+                                className="text-destructive focus:text-destructive"
+                              >
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>{file.size}</span>
+                          <span>{file.uploadedAt}</span>
+                        </div>
+                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-border">
+                          <span className="text-xs flex items-center gap-1">
+                            {file.is_private ? (
+                              <span className="flex items-center text-amber-500">
+                                <Lock className="h-3 w-3 mr-1" />
+                                Private
+                              </span>
+                            ) : (
+                              <span className="flex items-center text-green-500">
+                                <Globe className="h-3 w-3 mr-1" />
+                                Public
+                              </span>
+                            )}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">
+                              {file.is_private ? "Private" : "Public"}
+                            </span>
+                            <Switch
+                              checked={!file.is_private}
+                              onCheckedChange={() => toggleFileStatus(file.id)}
+                            />
+                          </div>
+                        </div>
+                      </CardFooter>
+                    </Card>
+                  ))}
+                </div>
+                
+                {/* Load more indicator */}
+                <div 
+                  ref={loadMoreRef} 
+                  className="w-full py-8 flex justify-center"
+                >
+                  {isLoading && hasMore && (
+                    <div className="flex flex-col items-center gap-2">
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                      <p className="text-sm text-muted-foreground">Loading more...</p>
+                    </div>
+                  )}
+                  {!hasMore && mediaFiles.length > 0 && (
+                    <p className="text-sm text-muted-foreground">No more files to load</p>
+                  )}
+                </div>
+              </>
+            ) : (
+              // Only show "No media found" if not loading and after initial fetch attempt
+              !isLoading && (
+                <div className="py-20 text-center">
+                  <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-muted">
+                    <ImageIcon className="h-10 w-10 text-muted-foreground" />
+                  </div>
+                  <h3 className="mt-4 text-lg font-semibold">No media found</h3>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {searchTerm ? "No results match your search" : "Upload some files to get started"}
+                  </p>
+                </div>
+              )
+            )
+          ) : null}
         </CardContent>
       </Card>
 

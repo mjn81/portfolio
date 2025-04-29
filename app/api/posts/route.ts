@@ -13,8 +13,9 @@ export async function POST(request: NextRequest) {
 			return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 		}
 		// Verify the JWT token
+		let decoded: { sub: string; role: string };
 		try {
-			jwt.verify(token, process.env.JWT_SECRET!);
+			decoded = jwt.verify(token, process.env.JWT_SECRET!) as { sub: string; role: string };
 		} catch (err) {
 			return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
 		}
@@ -29,26 +30,51 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
-		const { scheduledPublishTime, tags, ...rest } = parsed.data;
+		const { scheduledPublishTime, tags, content, image_alt_text, ...rest } = parsed.data;
 		const now = new Date();
 		let status = 'draft';
 		let scheduled_publish_time = null;
 		let published_at = null;
+		const authorId = decoded.sub; // Extract author ID from token
 
 		if (scheduledPublishTime) {
 			const scheduledTime = new Date(scheduledPublishTime);
-			if (scheduledTime > now) {
-				status = 'scheduled';
-				scheduled_publish_time = scheduledTime.toISOString();
-			} else {
-				status = 'published';
-				published_at = now.toISOString();
-			}
+				if (status === 'published') {
+					// If status is explicitly published, set publish date now
+					published_at = now.toISOString();
+				} else if (scheduledTime > now) {
+					// Otherwise, schedule it if the time is in the future
+					status = 'scheduled';
+					scheduled_publish_time = scheduledTime.toISOString();
+				} else {
+					// If scheduled time is in the past but status wasn't explicitly published, treat as draft (or default to published? choosing draft for safety)
+					// Or set to published now?
+					// Let's default to published if a past date is provided for scheduling
+					status = 'published'; 
+					published_at = now.toISOString();
+					// Alternatively, could return an error: 
+					// return NextResponse.json({ error: 'Scheduled time must be in the future' }, { status: 400 });
+				}
+		} else if (parsed.data.status === 'published') {
+			// Handle explicit 'published' status without a scheduled time
+			status = 'published';
+			published_at = now.toISOString();
 		}
+		// If status remains 'draft', published_at and scheduled_publish_time remain null
 
 		const { data, error } = await supabase
 			.from('posts')
-			.insert([{ ...rest, status, scheduled_publish_time, published_at }])
+			.insert([
+				{
+					...rest,
+					content, // Include content
+					author: authorId, // Include author ID
+					image_alt_text: image_alt_text, // Include alt text
+					status,
+					scheduled_publish_time,
+					published_at,
+				},
+			])
 			.select()
 			.single();
 

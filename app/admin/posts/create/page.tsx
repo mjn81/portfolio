@@ -49,8 +49,9 @@ function CreatePostPage() {
 	const [excerpt, setExcerpt] = useState('');
 	const [content, setContent] = useState('');
 	const [coverImage, setCoverImage] = useState(
-		'/placeholder.svg?height=400&width=600'
+		'/placeholder.svg?height=400&width=600' // Default placeholder for main image
 	);
+	const [coverImageAltText, setCoverImageAltText] = useState(''); // State for cover image alt text
 	const [status, setStatus] = useState('draft');
 	const [selectedTags, setSelectedTags] = useState<string[]>([]); // Store selected tag values (IDs or names)
 	const [readTime, setReadTime] = useState('');
@@ -61,8 +62,7 @@ function CreatePostPage() {
 	const [scheduledTime, setScheduledTime] = useState('12:00');
 	const [scheduledError, setScheduledError] = useState('');
 	const [galleryOpen, setGalleryOpen] = useState(false);
-	const [featuredImage, setFeaturedImage] = useState<string | null>(null);
-	const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+	const [isGalleryOpen, setIsGalleryOpen] = useState(false); // Keep for OG image picker?
 
 	// SEO fields
 	const [metaTitle, setMetaTitle] = useState('');
@@ -222,8 +222,12 @@ function CreatePostPage() {
 			title,
 			slug,
 			excerpt,
-			content, // Assuming RichTextEditor provides HTML string
-			image: featuredImage, // Use featuredImage state
+			content, // Content is now included
+			image:
+				coverImage === '/placeholder.svg?height=400&width=600'
+					? undefined
+					: coverImage, // Use coverImage state, send undefined if default
+			image_alt_text: coverImageAltText || undefined, // Add alt text
 			read_time: readTime || undefined,
 			status,
 			meta_title: metaTitle || undefined,
@@ -291,18 +295,14 @@ function CreatePostPage() {
 		);
 	};
 
-	const handleSelectImage = (imageUrl: string, altText: string) => {
+	const handleSelectCoverImage = (imageUrl: string, altText: string) => {
 		setCoverImage(imageUrl);
-
+		setCoverImageAltText(altText); // Set the alt text
 		// Also update OG image if it's still the default
 		if (ogImage.includes('placeholder.svg')) {
 			setOgImage(imageUrl);
 		}
-	};
-
-	const handleSelectFeaturedImage = (imageUrl: string) => {
-		setFeaturedImage(imageUrl);
-		setIsGalleryOpen(false);
+		setIsGalleryOpen(false); // Close the gallery after selection
 	};
 
 	const handleSelectOgImage = (imageUrl: string) => {
@@ -402,13 +402,13 @@ function CreatePostPage() {
 								<Card>
 									<CardContent className="p-4">
 										<div className="space-y-2">
-											<Label htmlFor="featured-image">Featured Image</Label>
+											<Label htmlFor="cover-image">Cover Image</Label>
 											<div className="flex flex-col gap-4">
-												{featuredImage ? (
+												{coverImage && !coverImage.includes('placeholder.svg') ? (
 													<div className="relative aspect-video w-full overflow-hidden rounded-lg border">
 														<Image
-															src={featuredImage || '/placeholder.svg'}
-															alt="Featured image"
+															src={coverImage}
+															alt={coverImageAltText}
 															fill
 															className="object-cover"
 														/>
@@ -416,7 +416,7 @@ function CreatePostPage() {
 															variant="destructive"
 															size="icon"
 															className="absolute top-2 right-2"
-															onClick={() => setFeaturedImage(null)}
+															onClick={() => setCoverImage('/placeholder.svg?height=400&width=600')} // Reset to placeholder
 														>
 															<Trash className="h-4 w-4" />
 														</Button>
@@ -426,7 +426,7 @@ function CreatePostPage() {
 														<div className="flex flex-col items-center gap-1 text-center">
 															<ImageIcon className="h-8 w-8 text-muted-foreground" />
 															<p className="text-sm text-muted-foreground">
-																No featured image selected
+																No cover image selected
 															</p>
 														</div>
 													</div>
@@ -434,9 +434,9 @@ function CreatePostPage() {
 												<Button
 													type="button"
 													variant="outline"
-													onClick={() => setIsGalleryOpen(true)}
+													onClick={() => setIsGalleryOpen(true)} // This opens the gallery for Cover Image
 												>
-													{featuredImage ? 'Change Image' : 'Select Image'}
+													{coverImage && !coverImage.includes('placeholder.svg') ? 'Change Image' : 'Select Image'}
 												</Button>
 											</div>
 										</div>
@@ -552,6 +552,13 @@ function CreatePostPage() {
 										</div>
 									</CardContent>
 								</Card>
+
+								{/* OG Image Picker Instance */}
+								<ImageGalleryPicker
+									open={galleryOpen}
+									onOpenChange={setGalleryOpen}
+									onSelectImage={handleSelectOgImage}
+								/>
 							</div>
 						</div>
 					</TabsContent>
@@ -670,15 +677,10 @@ function CreatePostPage() {
 			</form>
 
 			<ImageGalleryPicker
-				open={galleryOpen}
-				onOpenChange={setGalleryOpen}
-				onSelectImage={handleSelectOgImage}
-			/>
-			<ImageGalleryPicker
 				open={isGalleryOpen}
 				onOpenChange={setIsGalleryOpen}
-				onSelectImage={handleSelectFeaturedImage}
-				isPostImageUpload={true}
+				onSelectImage={handleSelectCoverImage} // Use handler for Cover image
+				isPostImageUpload={true} // Keep this potentially? Or manage via state
 			/>
 		</div>
 	);

@@ -1,10 +1,9 @@
 'use client';
 
 import type React from 'react';
-
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import { Check, ImageIcon, Search, Upload, X, Lock, Globe } from 'lucide-react';
+import { Check, ImageIcon, Search, Upload, X, Lock, Globe, Loader2, AlertCircle } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,90 +20,8 @@ import { Progress } from '@/components/ui/progress';
 import { toast } from '@/components/ui/use-toast';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-
-// Mock data for media files - in a real app, this would come from your API
-const mockMediaFiles = [
-	{
-		id: 1,
-		name: 'hero-image.jpg',
-		type: 'image',
-		url: '/placeholder.svg?height=400&width=600',
-		size: '1.2 MB',
-		dimensions: '1920x1080',
-		uploadedAt: '2023-09-15',
-		status: 'public',
-	},
-	{
-		id: 2,
-		name: 'portfolio-photo.jpg',
-		type: 'image',
-		url: '/placeholder.svg?height=400&width=600',
-		size: '843 KB',
-		dimensions: '1600x900',
-		uploadedAt: '2023-08-22',
-		status: 'public',
-	},
-	{
-		id: 6,
-		name: 'project-screenshot.png',
-		type: 'image',
-		url: '/placeholder.svg?height=400&width=600',
-		size: '1.8 MB',
-		dimensions: '2560x1440',
-		uploadedAt: '2023-10-12',
-		status: 'public',
-	},
-	{
-		id: 8,
-		name: 'profile-picture.jpg',
-		type: 'image',
-		url: '/placeholder.svg?height=400&width=600',
-		size: '942 KB',
-		dimensions: '800x800',
-		uploadedAt: '2023-08-03',
-		status: 'public',
-	},
-	{
-		id: 9,
-		name: 'blog-header.jpg',
-		type: 'image',
-		url: '/placeholder.svg?height=400&width=600',
-		size: '1.5 MB',
-		dimensions: '1200x630',
-		uploadedAt: '2023-11-01',
-		status: 'private',
-	},
-	{
-		id: 10,
-		name: 'team-photo.jpg',
-		type: 'image',
-		url: '/placeholder.svg?height=400&width=600',
-		size: '2.3 MB',
-		dimensions: '2000x1333',
-		uploadedAt: '2023-10-25',
-		status: 'public',
-	},
-	{
-		id: 11,
-		name: 'product-demo.jpg',
-		type: 'image',
-		url: '/placeholder.svg?height=400&width=600',
-		size: '1.1 MB',
-		dimensions: '1600x900',
-		uploadedAt: '2023-09-18',
-		status: 'private',
-	},
-	{
-		id: 12,
-		name: 'office-space.jpg',
-		type: 'image',
-		url: '/placeholder.svg?height=400&width=600',
-		size: '1.7 MB',
-		dimensions: '2400x1600',
-		uploadedAt: '2023-07-30',
-		status: 'public',
-	},
-];
+import { MediaFile } from '@/types/file';
+import { formatBytes } from '@/lib/utils';
 
 interface ImageGalleryPickerProps {
 	open?: boolean;
@@ -120,30 +37,77 @@ export function ImageGalleryPicker({
 	isPostImageUpload = false,
 }: ImageGalleryPickerProps) {
 	const [searchTerm, setSearchTerm] = useState('');
-	const [selectedImageId, setSelectedImageId] = useState<number | null>(null);
+	const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
+	const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
 	const [activeTab, setActiveTab] = useState('browse');
 	const [altText, setAltText] = useState('');
-	const [mediaFiles, setMediaFiles] = useState(mockMediaFiles);
-	const [featuredImage, setFeaturedImage] = useState<string | null>(null);
-	const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+
+	// API State
+	const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
+	const [isLoading, setIsLoading] = useState(false);
+	const [error, setError] = useState<string | null>(null);
 
 	// Upload states
 	const [isDragging, setIsDragging] = useState(false);
 	const [isUploading, setIsUploading] = useState(false);
-	const [uploadProgress, setUploadProgress] = useState(0);
-	const [currentUploads, setCurrentUploads] = useState<
+	const [uploadFiles, setUploadFiles] = useState<
 		{
 			file: File;
 			progress: number;
 			preview?: string;
 			status: 'pending' | 'uploading' | 'complete' | 'error';
 			error?: string;
+			id?: string;
 		}[]
 	>([]);
+	const [uploadIsPrivate, setUploadIsPrivate] = useState(!isPostImageUpload);
 
 	const fileInputRef = useRef<HTMLInputElement>(null);
 
-	// Filter images based on search term
+	// --- Fetch Media ---
+	const fetchMedia = useCallback(async () => {
+		setIsLoading(true);
+		setMediaFiles([]);
+		setError(null);
+
+		const queryParams = new URLSearchParams({
+			limit: '50',
+		});
+
+		try {
+			const response = await fetch(`/api/media?${queryParams.toString()}`);
+			if (!response.ok) {
+				throw new Error('Failed to fetch media files.');
+			}
+			const data = await response.json();
+
+			setMediaFiles(data.media || []);
+		} catch (err: any) {
+			console.error('Error fetching media:', err);
+			setError(err.message || 'Could not load media.');
+		} finally {
+			setIsLoading(false);
+		}
+	}, []);
+
+	// Initial fetch on dialog open
+	useEffect(() => {
+		if (open) {
+			fetchMedia();
+		}
+		if (!open) {
+			setSelectedImageId(null);
+			setSelectedImageUrl(null);
+			setAltText('');
+			setSearchTerm('');
+			setActiveTab('browse');
+			setUploadFiles([]);
+			setMediaFiles([]);
+			setError(null);
+		}
+	}, [open, fetchMedia]);
+
+	// Filter images based on search term (client-side for now)
 	const filteredImages = mediaFiles.filter((file) => {
 		const matchesSearch = file.name
 			.toLowerCase()
@@ -151,34 +115,24 @@ export function ImageGalleryPicker({
 		return matchesSearch;
 	});
 
-	const handleSelectImage = (id: number) => {
-		setSelectedImageId(id);
-		// Set default alt text based on image name
-		const selectedImage = mediaFiles.find((img) => img.id === id);
-		if (selectedImage) {
-			// Remove file extension and replace dashes/underscores with spaces
-			const nameWithoutExtension = selectedImage.name.replace(/\.[^/.]+$/, '');
-			const formattedName = nameWithoutExtension.replace(/[-_]/g, ' ');
-			setAltText(formattedName);
-		}
+	const handleSelectImage = (image: MediaFile) => {
+		setSelectedImageId(image.id);
+		setSelectedImageUrl(image.url);
+		const nameWithoutExtension = image.name.replace(/\.[^/.]+$/, '');
+		const formattedName = nameWithoutExtension.replace(/[-_]/g, ' ');
+		setAltText(formattedName);
 	};
 
 	const handleInsertImage = () => {
-		const selectedImage = mediaFiles.find((img) => img.id === selectedImageId);
-		if (selectedImage && onSelectImage) {
-			onSelectImage(selectedImage.url, altText);
+		if (selectedImageUrl && onSelectImage) {
+			onSelectImage(selectedImageUrl, altText);
 			if (onOpenChange) {
 				onOpenChange(false);
 			}
-			// Reset state
-			setSelectedImageId(null);
-			setSearchTerm('');
-			setAltText('');
-			setActiveTab('browse');
 		}
 	};
 
-	// Handle drag events
+	// --- Upload Logic ---
 	const handleDragEnter = (e: React.DragEvent) => {
 		e.preventDefault();
 		e.stopPropagation();
@@ -197,11 +151,9 @@ export function ImageGalleryPicker({
 		if (!isDragging) setIsDragging(true);
 	};
 
-	// Process files for upload
-	const processFiles = (files: FileList | null) => {
+	const processAndPrepareFiles = (files: FileList | null) => {
 		if (!files || files.length === 0) return;
 
-		// Convert FileList to array and filter for images
 		const fileArray = Array.from(files).filter((file) =>
 			file.type.startsWith('image/')
 		);
@@ -209,129 +161,139 @@ export function ImageGalleryPicker({
 		if (fileArray.length === 0) {
 			toast({
 				title: 'Invalid files',
-				description: 'Please select image files only (JPG, PNG, GIF, etc.)',
+				description: 'Please select image files only.',
 				variant: 'destructive',
 			});
 			return;
 		}
 
-		// Check file sizes (max 5MB per file)
-		const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+		const MAX_SIZE = 10 * 1024 * 1024;
 		const oversizedFiles = fileArray.filter((file) => file.size > MAX_SIZE);
 
 		if (oversizedFiles.length > 0) {
 			toast({
 				title: 'Files too large',
-				description: `${oversizedFiles.length} file(s) exceed the 5MB limit`,
+				description: `${oversizedFiles.length} file(s) exceed the 10MB limit.`,
 				variant: 'destructive',
 			});
 			return;
 		}
 
-		// Create upload objects with previews
-		const newUploads = fileArray.map((file) => {
-			return {
-				file,
-				progress: 0,
-				preview: URL.createObjectURL(file),
-				status: 'pending' as const,
-			};
-		});
+		const newUploads = fileArray.map((file) => ({
+			file,
+			progress: 0,
+			preview: URL.createObjectURL(file),
+			status: 'pending' as const,
+		}));
 
-		setCurrentUploads((prev) => [...prev, ...newUploads]);
-		simulateUpload(newUploads);
+		setUploadFiles((prev) => [...prev, ...newUploads]);
+		handleUpload(newUploads);
 	};
 
 	const handleDrop = (e: React.DragEvent) => {
 		e.preventDefault();
 		e.stopPropagation();
 		setIsDragging(false);
-
-		processFiles(e.dataTransfer.files);
+		processAndPrepareFiles(e.dataTransfer.files);
 	};
 
 	const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-		processFiles(e.target.files);
-		// Reset the input value so the same file can be selected again
+		processAndPrepareFiles(e.target.files);
 		if (fileInputRef.current) fileInputRef.current.value = '';
 	};
 
-	// Simulate file upload with progress
-	const simulateUpload = (uploads: typeof currentUploads) => {
+	// Actual file upload
+	const handleUpload = async (filesToUpload: typeof uploadFiles) => {
+		if (filesToUpload.length === 0) return;
+
 		setIsUploading(true);
 
-		uploads.forEach((upload, index) => {
-			let progress = 0;
-			const interval = setInterval(() => {
-				progress += Math.random() * 10;
+		setUploadFiles((prev) =>
+			prev.map((up) =>
+				filesToUpload.some((ftu) => ftu.file.name === up.file.name && up.status === 'pending')
+					? { ...up, status: 'uploading' }
+					: up
+			)
+		);
 
-				if (progress >= 100) {
-					progress = 100;
-					clearInterval(interval);
+		const uploadPromises = filesToUpload.map(async (upload) => {
+			const formData = new FormData();
+			formData.append('files', upload.file);
+			formData.append('is_private', String(uploadIsPrivate));
 
-					// Update upload status
-					setCurrentUploads((prev) =>
-						prev.map((item, i) =>
-							item.file.name === upload.file.name
-								? { ...item, progress: 100, status: 'complete' }
-								: item
-						)
-					);
+			try {
+				const response = await fetch('/api/media/upload', {
+					method: 'POST',
+					body: formData,
+				});
 
-					// Add to media library after "upload" completes
-					const newId = Math.max(...mediaFiles.map((file) => file.id)) + 1;
-					const newMediaFile = {
-						id: newId,
-						name: upload.file.name,
-						type: 'image',
-						url: upload.preview || '/placeholder.svg',
-						size: `${(upload.file.size / 1024).toFixed(0)} KB`,
-						dimensions: '1200x800', // This would come from actual image in real app
-						uploadedAt: new Date().toISOString().split('T')[0],
-						status: isPostImageUpload ? 'public' : 'public', // Default to public, always public for post images
-					};
+				const result = await response.json();
 
-					setMediaFiles((prev) => [newMediaFile, ...prev]);
-
-					// Check if all uploads are complete
-					const allComplete = uploads.every((u, i) => {
-						if (i === index) return true;
-						return u.status === 'complete';
-					});
-
-					if (allComplete) {
-						setIsUploading(false);
-						toast({
-							title: 'Upload complete',
-							description: `${uploads.length} image(s) uploaded successfully`,
-						});
-
-						// Switch to browse tab after upload completes
-						setTimeout(() => {
-							setActiveTab('browse');
-							// Clear uploads after a delay
-							setTimeout(() => {
-								setCurrentUploads([]);
-							}, 2000);
-						}, 1000);
-					}
-				} else {
-					// Update progress
-					setCurrentUploads((prev) =>
-						prev.map((item, i) =>
-							item.file.name === upload.file.name
-								? { ...item, progress, status: 'uploading' }
-								: item
-						)
-					);
+				if (!response.ok || result.files?.length === 0) {
+					throw new Error(result.error || 'Upload failed');
 				}
-			}, 200);
+
+				const uploadedFile = result.files[0];
+
+				setUploadFiles((prev) =>
+					prev.map((item) =>
+						item.file.name === upload.file.name
+							? { ...item, progress: 100, status: 'complete', id: uploadedFile.id }
+							: item
+					)
+				);
+
+				setMediaFiles((prev) => [uploadedFile, ...prev]);
+
+				return { success: true, file: uploadedFile };
+
+			} catch (error: any) {
+				console.error('Upload error for:', upload.file.name, error);
+				setUploadFiles((prev) =>
+					prev.map((item) =>
+						item.file.name === upload.file.name
+							? { ...item, status: 'error', error: error.message }
+							: item
+					)
+				);
+				return { success: false, error: error.message };
+			}
 		});
+
+		await Promise.all(uploadPromises);
+
+		const stillUploading = uploadFiles.some(up => up.status === 'uploading');
+		if (!stillUploading) {
+			setIsUploading(false);
+			const successfulUploads = uploadFiles.filter(up => up.status === 'complete').length;
+			const failedUploads = uploadFiles.filter(up => up.status === 'error').length;
+
+			if (successfulUploads > 0) {
+				toast({
+					title: 'Upload Complete',
+					description: `${successfulUploads} image(s) uploaded successfully.`,
+				});
+			}
+			if (failedUploads > 0) {
+				toast({
+					title: 'Upload Partially Failed',
+					description: `${failedUploads} image(s) failed to upload.`,
+					variant: 'destructive',
+				});
+			}
+
+			if (successfulUploads > 0 && failedUploads === 0) {
+				setTimeout(() => {
+					setActiveTab('browse');
+				}, 1000);
+			}
+		}
 	};
 
+	// --- Render ---
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
+			<DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
 				<DialogHeader>
 					<DialogTitle>Media Library</DialogTitle>
 				</DialogHeader>
@@ -339,9 +301,9 @@ export function ImageGalleryPicker({
 				<Tabs
 					value={activeTab}
 					onValueChange={setActiveTab}
-					className="flex-1 flex flex-col"
+					className="flex-1 flex flex-col overflow-hidden"
 				>
-					<div className="flex items-center justify-between mb-4">
+					<div className="flex-shrink-0 flex items-center justify-between mb-4 pr-6">
 						<TabsList>
 							<TabsTrigger value="browse">Browse Library</TabsTrigger>
 							<TabsTrigger value="upload">Upload New</TabsTrigger>
@@ -371,25 +333,33 @@ export function ImageGalleryPicker({
 					</div>
 
 					<div className="flex-1 flex flex-col min-h-0">
-						<TabsContent value="browse" className="flex-1 mt-0">
-							<ScrollArea className="h-[400px] pr-4">
-								{filteredImages.length > 0 ? (
-									<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+						<TabsContent value="browse" className="flex-1 mt-0 flex flex-col">
+							<ScrollArea
+								className="flex-1 pr-4"
+							>
+								{error && (
+									<div className="py-8 text-center text-red-600 flex flex-col items-center gap-2">
+										<AlertCircle className="h-6 w-6" />
+										<p>Error loading media: {error}</p>
+										<Button variant="outline" size="sm" onClick={() => fetchMedia()}>Retry</Button>
+									</div>
+								)}
+								{!error && filteredImages.length > 0 && (
+									<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
 										{filteredImages.map((image) => (
 											<div
 												key={image.id}
 												className={`
-                          relative aspect-square rounded-md overflow-hidden cursor-pointer border-2
-                          ${
-														selectedImageId === image.id
-															? 'border-primary ring-2 ring-primary/20'
-															: 'border-transparent hover:border-muted'
+                          relative aspect-square rounded-md overflow-hidden cursor-pointer border-2 group
+                          ${selectedImageId === image.id
+														? 'border-primary ring-2 ring-primary/20'
+														: 'border-border hover:border-muted'
 													}
                         `}
-												onClick={() => handleSelectImage(image.id)}
+												onClick={() => handleSelectImage(image)}
 											>
-												{image.status === 'private' && (
-													<div className="absolute top-2 right-2 z-10 bg-background/90 rounded-full p-1">
+												{image.is_private && (
+													<div className="absolute top-1 right-1 z-10 bg-background/90 rounded-full p-1">
 														<Lock className="h-3 w-3 text-amber-500" />
 													</div>
 												)}
@@ -397,44 +367,53 @@ export function ImageGalleryPicker({
 													src={image.url || '/placeholder.svg'}
 													alt={image.name}
 													fill
-													className="object-cover"
+													sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
+													className="object-cover transition-transform duration-200 group-hover:scale-105"
 												/>
 												{selectedImageId === image.id && (
-													<div className="absolute top-2 left-2 bg-primary text-primary-foreground rounded-full p-1">
+													<div className="absolute top-1 left-1 bg-primary text-primary-foreground rounded-full p-1 shadow-md">
 														<Check className="h-4 w-4" />
 													</div>
 												)}
-												<div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white p-1 text-xs truncate">
-													{image.name}
+												<div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent p-2 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+													<p className="text-xs font-medium truncate">{image.name}</p>
+													<p className="text-[10px] text-gray-300">{formatBytes(image.size)}</p>
 												</div>
 											</div>
 										))}
 									</div>
-								) : (
+								)}
+								{isLoading && (
+									<div className="py-8 flex justify-center items-center gap-2 text-muted-foreground">
+										<Loader2 className="h-5 w-5 animate-spin" />
+										<span>Loading media...</span>
+									</div>
+								)}
+								{!isLoading && !error && filteredImages.length === 0 && (
 									<div className="py-8 text-center">
-										<p className="text-muted-foreground">No images found</p>
+										<ImageIcon className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+										<p className="text-muted-foreground">No images found matching your criteria.</p>
+										{mediaFiles.length === 0 && !searchTerm && (
+											<p className="text-sm text-muted-foreground mt-1">Upload some images to get started!</p>
+										)}
 									</div>
 								)}
 							</ScrollArea>
 						</TabsContent>
 
 						<TabsContent value="upload" className="flex-1 mt-0">
-							<div className="h-[400px] flex flex-col">
+							<div className="h-full flex flex-col">
 								<div
 									className={`
-                    flex-1 rounded-lg border-2 border-dashed flex flex-col items-center justify-center p-6
-                    ${
-											isDragging
-												? 'border-primary bg-primary/5'
-												: 'border-muted-foreground/25'
-										}
-                    ${isUploading ? 'pointer-events-none' : 'cursor-pointer'}
+                    flex-1 rounded-lg border-2 border-dashed flex flex-col items-center justify-center p-6 text-center
+                    ${isDragging ? 'border-primary bg-primary/5' : 'border-muted-foreground/25'}
+                    ${isUploading ? 'opacity-75' : 'cursor-pointer'}
                   `}
 									onDragEnter={handleDragEnter}
 									onDragOver={handleDragOver}
 									onDragLeave={handleDragLeave}
 									onDrop={handleDrop}
-									onClick={() => fileInputRef.current?.click()}
+									onClick={() => !isUploading && fileInputRef.current?.click()}
 								>
 									<input
 										ref={fileInputRef}
@@ -443,58 +422,68 @@ export function ImageGalleryPicker({
 										multiple
 										className="hidden"
 										onChange={handleFileInputChange}
+										disabled={isUploading}
 									/>
 
-									{currentUploads.length === 0 ? (
+									{uploadFiles.length === 0 ? (
 										<>
 											<Upload className="h-10 w-10 text-muted-foreground mb-4" />
 											<h3 className="text-lg font-medium mb-1">
-												Drag images here
+												{isUploading ? 'Uploading...' : 'Drag images here'}
 											</h3>
 											<p className="text-sm text-muted-foreground mb-4">
 												or click to browse
 											</p>
-											<p className="text-xs text-muted-foreground text-center max-w-sm">
-												Supports: JPG, PNG, GIF, WebP • Max size: 5MB per image
+											<p className="text-xs text-muted-foreground">
+												Supports: JPG, PNG, GIF, WebP • Max size: 10MB per image
 											</p>
 
 											<div className="mt-6 flex items-center justify-center gap-2">
 												<div className="flex items-center space-x-2">
 													<Switch
 														id="upload-status"
-														checked={true}
-														disabled={isPostImageUpload}
+														checked={!uploadIsPrivate}
+														onCheckedChange={(checked) => setUploadIsPrivate(!checked)}
+														disabled={isPostImageUpload || isUploading}
 													/>
 													<Label
 														htmlFor="upload-status"
-														className="flex items-center gap-1.5"
+														className="flex items-center gap-1.5 cursor-pointer"
 													>
-														<Globe className="h-4 w-4 text-green-500" />
-														<span>Public</span>
-														{isPostImageUpload && (
-															<span className="text-xs text-muted-foreground">
-																(Post images are always public)
-															</span>
+														{!uploadIsPrivate ? (
+															<>
+																<Globe className="h-4 w-4 text-green-500" /> Public
+															</>
+														) : (
+															<>
+																<Lock className="h-4 w-4 text-amber-500" /> Private
+															</>
 														)}
 													</Label>
 												</div>
 											</div>
+											{isPostImageUpload && (
+												<p className="text-xs text-muted-foreground mt-1">
+													(Post images are always public)
+												</p>
+											)}
 										</>
 									) : (
-										<div className="w-full space-y-4">
-											<h3 className="text-lg font-medium text-center mb-4">
-												{isUploading ? 'Uploading...' : 'Upload Complete'}
+										<div className="w-full max-h-full overflow-y-auto space-y-3 pr-2">
+											<h3 className="text-lg font-medium text-center mb-2 sticky top-0 bg-background py-1">
+												{isUploading ? 'Uploading...' : 'Upload Queue'}
 											</h3>
 
-											{currentUploads.map((upload, index) => (
-												<div key={index} className="flex items-center gap-3">
+											{uploadFiles.map((upload, index) => (
+												<div key={`${upload.file.name}-${index}`} className="flex items-center gap-3 p-2 border rounded-md bg-muted/30">
 													<div className="relative h-12 w-12 rounded overflow-hidden bg-muted flex-shrink-0">
 														{upload.preview ? (
 															<Image
-																src={upload.preview || '/placeholder.svg'}
+																src={upload.preview}
 																alt={upload.file.name}
 																fill
 																className="object-cover"
+																onLoad={() => URL.revokeObjectURL(upload.preview!)}
 															/>
 														) : (
 															<ImageIcon className="h-6 w-6 m-auto text-muted-foreground" />
@@ -505,33 +494,53 @@ export function ImageGalleryPicker({
 														<p className="text-sm font-medium truncate">
 															{upload.file.name}
 														</p>
-														<div className="flex items-center gap-2">
-															<Progress
-																value={upload.progress}
-																className="h-1.5 flex-1"
-															/>
-															<span className="text-xs text-muted-foreground whitespace-nowrap">
-																{upload.progress.toFixed(0)}%
-															</span>
-														</div>
+														{upload.status === 'uploading' && (
+															<Progress value={upload.progress} className="h-1.5 mt-1" />
+														)}
+														{upload.status === 'pending' && (
+															<p className="text-xs text-muted-foreground mt-1">Pending...</p>
+														)}
+														{upload.status === 'error' && (
+															<p className="text-xs text-red-500 mt-1 truncate" title={upload.error}>Error: {upload.error}</p>
+														)}
 													</div>
 
 													{upload.status === 'complete' && (
-														<Check className="h-4 w-4 text-green-500" />
+														<Check className="h-5 w-5 text-green-500 flex-shrink-0" />
+													)}
+													{upload.status === 'error' && (
+														<AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
+													)}
+													{upload.status === 'uploading' && (
+														<Loader2 className="h-5 w-5 text-blue-500 animate-spin flex-shrink-0" />
+													)}
+													{(upload.status === 'pending' || upload.status === 'error') && !isUploading && (
+														<Button
+															variant="ghost"
+															size="icon"
+															className="h-6 w-6 text-muted-foreground hover:text-destructive"
+															onClick={(e) => {
+																e.stopPropagation();
+																setUploadFiles(prev => prev.filter((f, i) => !(f.file.name === upload.file.name && i === index)));
+															}}
+														>
+															<X className="h-4 w-4" />
+														</Button>
 													)}
 												</div>
 											))}
 
-											{!isUploading && (
+											{!isUploading && uploadFiles.length > 0 && (
 												<Button
 													variant="outline"
-													className="w-full mt-4"
+													className="w-full mt-4 sticky bottom-0 bg-background"
 													onClick={(e) => {
 														e.stopPropagation();
 														fileInputRef.current?.click();
 													}}
+													disabled={isUploading}
 												>
-													Upload More
+													Add More Files
 												</Button>
 											)}
 										</div>
@@ -542,30 +551,26 @@ export function ImageGalleryPicker({
 					</div>
 				</Tabs>
 
-				{selectedImageId && activeTab === 'browse' && (
-					<div className="mt-4 pt-4 border-t">
-						<div className="mb-4">
-							<label
-								htmlFor="alt-text"
-								className="block text-sm font-medium mb-1"
-							>
-								Alt Text
-							</label>
-							<Input
-								id="alt-text"
-								value={altText}
-								onChange={(e) => setAltText(e.target.value)}
-								placeholder="Describe this image"
-								className="w-full"
-							/>
-							<p className="text-xs text-muted-foreground mt-1">
-								Add descriptive text to help with accessibility and SEO
-							</p>
-						</div>
+				<DialogFooter className="mt-4 pt-4 border-t flex-shrink-0">
+					<div className="flex-1 w-full pr-16">
+						{selectedImageId && activeTab === 'browse' && (
+							<div className="">
+								<Label htmlFor="alt-text" className="block text-sm font-medium mb-1">
+									Alt Text (for selected image)
+								</Label>
+								<Input
+									id="alt-text"
+									value={altText}
+									onChange={(e) => setAltText(e.target.value)}
+									placeholder="Describe the selected image"
+									className="w-full"
+								/>
+								<p className="text-xs text-muted-foreground mt-1">
+									Helps with accessibility and SEO.
+								</p>
+							</div>
+						)}
 					</div>
-				)}
-
-				<DialogFooter>
 					<Button
 						variant="outline"
 						onClick={() => onOpenChange && onOpenChange(false)}
@@ -574,7 +579,7 @@ export function ImageGalleryPicker({
 					</Button>
 					<Button
 						onClick={handleInsertImage}
-						disabled={!selectedImageId || activeTab !== 'browse'}
+						disabled={!selectedImageId || activeTab !== 'browse' || isUploading}
 					>
 						Insert Image
 					</Button>
