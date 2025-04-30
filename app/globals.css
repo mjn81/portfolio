@@ -47,6 +47,23 @@
     --input: 240 3.7% 15.9%;
     --ring: 267 75% 60%;
   }
+
+  /* Style code blocks within prose */
+  .prose pre {
+    @apply border bg-muted rounded-md p-4 overflow-x-auto;
+  }
+
+  /* Ensure inner code doesn't conflict (optional, keeps hljs theme background) */
+  .prose pre code.hljs {
+     /* If hljs theme provides its own background, ensure it's not overridden by prose defaults */
+     @apply bg-transparent p-0; 
+  }
+
+  /* Add smooth scrolling behavior to the entire site */
+  html {
+    scroll-behavior: smooth;
+    height: 100%;
+  }
 }
 
 @layer base {
@@ -55,12 +72,6 @@
   }
   body {
     @apply bg-background text-foreground;
-  }
-
-  /* Add smooth scrolling behavior to the entire site */
-  html {
-    scroll-behavior: smooth;
-    height: 100%;
   }
 }
 

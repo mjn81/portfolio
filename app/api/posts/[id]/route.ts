@@ -80,11 +80,39 @@ export async function PUT(
 			);
 		}
 
-		const { tags, ...postUpdateData } = parsed.data;
+		const { tags, ...postUpdateDataFromSchema } = parsed.data;
+
+		// Prepare the final update object for the database (using snake_case)
+		const postUpdateData: { [key: string]: any } = { ...postUpdateDataFromSchema };
+
+		// Map scheduledPublishTime from schema (camelCase) to database column (snake_case)
+		// Important: Only include if it was actually in the parsed data
+		if (postUpdateDataFromSchema.hasOwnProperty('scheduledPublishTime')) {
+			postUpdateData.scheduled_publish_time = postUpdateDataFromSchema.scheduledPublishTime;
+			// Remove the camelCase version if you want to be strict, though Supabase might ignore it
+			// delete postUpdateData.scheduledPublishTime;
+		}
+
+		// --- Add/Clear published_at based on status ---
+		if (postUpdateData.status === 'published') {
+			postUpdateData.published_at = new Date().toISOString(); // Use snake_case
+			postUpdateData.scheduled_publish_time = null; // Use snake_case & ensure it's null
+		} else if (postUpdateData.status === 'draft') {
+			 // Optional: Clear published_at if moving back to draft?
+			 // postUpdateData.published_at = null;
+		} else if (postUpdateData.status === 'scheduled' && postUpdateData.scheduled_publish_time !== undefined) {
+			 // If moving to scheduled (and time is provided), clear published_at
+			 postUpdateData.published_at = null; // Use snake_case
+		}
+
+		// --- Update Post Table ---
+		// Remove fields not directly in the 'posts' table before update
+		// (e.g., remove scheduledPublishTime if you didn't delete it earlier)
+		delete postUpdateData.scheduledPublishTime; 
 
 		const { data: updatedPost, error: updateError } = await supabase
 			.from('posts')
-			.update(postUpdateData)
+			.update(postUpdateData) // Use the processed update data
 			.eq('id', params.id)
 			.select('id')
 			.single();

@@ -55,6 +55,8 @@ interface BlogPost {
 	slug: string;
 	tags: string[];
 	readTime?: string;
+	published_at?: string;
+	read_time?: string;
 }
 
 interface PaginationData {
@@ -74,6 +76,7 @@ export default function BlogPage() {
 	// Loading state
 	const [initialLoading, setInitialLoading] = useState(true);
 	const [loading, setLoading] = useState(false);
+	const [loadingMore, setLoadingMore] = useState(false);
 
 	// Posts and pagination state
 	const [posts, setPosts] = useState<BlogPost[]>([]);
@@ -90,38 +93,43 @@ export default function BlogPage() {
 	const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
 	const [allTags, setAllTags] = useState<Tag[]>([]);
 	const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	const loadMoreRef = useRef(null);
 
 	// Fetch posts with pagination and filters
 	const fetchPosts = async (reset = false) => {
 		const currentPage = reset ? 1 : pagination.page;
 
-		if (reset) {
+		if (reset || currentPage === 1) {
 			setLoading(true);
+		} else {
+			setLoadingMore(true);
 		}
 
 		try {
 			const queryParams = new URLSearchParams({
 				page: currentPage.toString(),
 				limit: pagination.limit.toString(),
-				status: 'published', // Only fetch published posts
-				sortBy: 'date',
-				sortOrder: 'desc',
+				status: 'published',
+				sort: 'published_at',
+				order: 'desc',
 			});
 
-			if (searchTerm) queryParams.append('search', searchTerm);
+			if (searchTerm) queryParams.append('query', searchTerm);
 
-			// Add all selected tags
-			selectedTags.forEach((tag) => {
-				queryParams.append('tag', tag.slug);
-			});
+			if (selectedTags.length > 0) {
+				queryParams.append('tag', selectedTags.map(tag => tag.slug).join(','));
+			}
 
 			const response = await fetch(`/api/posts?${queryParams.toString()}`);
+			if (!response.ok) {
+				throw new Error(`Failed to fetch posts: ${response.statusText}`);
+			}
 			const data = await response.json();
 
 			if (reset) {
-				setPosts(data.data);
+				setPosts(data.data || []);
 			} else {
-				setPosts((prev) => [...prev, ...data.posts]);
+				setPosts((prev) => [...prev, ...(data.data || [])]);
 			}
 
 			setPagination(data.meta);
@@ -129,10 +137,10 @@ export default function BlogPage() {
 			console.error('Error fetching posts:', error);
 		} finally {
 			setLoading(false);
+			setLoadingMore(false);
 			if (initialLoading) setInitialLoading(false);
 		}
 	};
-
 
 	const fetchTags = async () => {
 		try {
@@ -144,11 +152,11 @@ export default function BlogPage() {
 		}
 	}
 
-	// Initial fetch
+	// Add a separate useEffect for initial data fetching only
 	useEffect(() => {
 		fetchPosts(true);
 		fetchTags();
-	}, []);
+	}, []); // Run only once on mount
 
 	// Handle search with debounce
 	useEffect(() => {
@@ -174,13 +182,43 @@ export default function BlogPage() {
 		);
 	};
 
-	// Load more posts
+	// Load more posts function (triggered by observer)
 	const loadMorePosts = () => {
-		if (pagination.hasMore && !loading) {
+		if (pagination.hasMore && !loading && !loadingMore) {
 			setPagination((prev) => ({ ...prev, page: prev.page + 1 }));
-			fetchPosts(false);
 		}
 	};
+
+	// Effect to fetch when page number changes (for loadMore)
+	useEffect(() => {
+		if (pagination.page > 1) {
+			fetchPosts(false);
+		}
+	}, [pagination.page]);
+
+	// Setup Intersection Observer
+	useEffect(() => {
+		const observer = new IntersectionObserver(
+			(entries) => {
+				const firstEntry = entries[0];
+				if (firstEntry.isIntersecting) {
+					loadMorePosts();
+				}
+			},
+			{ threshold: 1.0 }
+		);
+
+		const currentRef = loadMoreRef.current;
+		if (currentRef) {
+			observer.observe(currentRef);
+		}
+
+		return () => {
+			if (currentRef) {
+				observer.unobserve(currentRef);
+			}
+		};
+	}, [loadMorePosts]);
 
 	return (
 		<main className="min-h-screen">
@@ -191,7 +229,7 @@ export default function BlogPage() {
 				{/* Background elements */}
 				<div className="absolute top-0 right-0 w-1/3 h-1/3 bg-primary/5 rounded-bl-full blur-3xl" />
 				<div className="absolute bottom-0 left-0 w-1/4 h-1/4 bg-accent/5 rounded-tr-full blur-3xl" />
-				<div className="absolute inset-0 bg-[url('/placeholder.svg?height=2&width=2')] bg-[length:30px_30px] opacity-[0.02]" />
+				<div className="absolute inset-0 bg-[url('/placeholder.svg?height=2&width=2')] bg-[length:30px_30px] opacity-[0.02] pointer-events-none" />
 
 				<div className="container mx-auto px-4">
 					{/* Header section */}
@@ -362,15 +400,15 @@ export default function BlogPage() {
 													<div className="flex items-center justify-between text-sm mb-3">
 														<div className="flex items-center text-primary font-medium">
 															<Calendar className="h-4 w-4 mr-1" />
-															<span>{post.date}</span>
+															<span>{post.published_at ? new Date(post.published_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A'}</span>
 														</div>
 														<div className="flex items-center text-foreground/60">
 															<Clock className="h-4 w-4 mr-1" />
-															<span>{post.readTime || '5 min read'}</span>
+															<span>{post.read_time || '5 min read'}</span>
 														</div>
 													</div>
 
-													<h3 className="text-xl font-bold mb-3 line-clamp-2 title-fill-animation">
+													<h3 className="text-xl font-bold mb-3 line-clamp-2 title-fill-animation group-hover:text-accent transition-colors duration-200">
 														{post.title}
 													</h3>
 
@@ -379,7 +417,7 @@ export default function BlogPage() {
 													</p>
 
 													<div className="flex flex-wrap gap-2 mt-auto mb-4">
-														{post.tags.slice(0, 2).map((tag, tagIndex) => (
+														{post.tags.slice(0, 2).map((tag: string, tagIndex: number) => (
 															<span
 																key={tagIndex}
 																className="px-2 py-1 bg-primary/10 text-primary text-xs rounded-full"
@@ -394,7 +432,7 @@ export default function BlogPage() {
 														)}
 													</div>
 
-													<div className="text-primary font-medium text-sm flex items-center group-hover:translate-x-1 transition-transform">
+													<div className="text-foreground/80 group-hover:text-accent font-medium text-sm flex items-center mt-auto group-hover:translate-x-1 transition-transform duration-200">
 														Read Article
 														<ArrowRight className="ml-1 h-4 w-4" />
 													</div>
@@ -432,27 +470,18 @@ export default function BlogPage() {
 						</motion.div>
 					)}
 
-					{/* Load more button */}
-					{pagination.hasMore && posts.length > 0 && (
-						<div className="flex justify-center mt-12">
-							<Button
-								variant="outline"
-								size="lg"
-								onClick={loadMorePosts}
-								disabled={loading}
-								className="min-w-[200px]"
-							>
-								{loading ? (
-									<div className="flex items-center">
-										<div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></div>
-										Loading...
-									</div>
-								) : (
-									<>Load More Articles</>
-								)}
-							</Button>
-						</div>
-					)}
+					{/* Load more trigger & indicator */}
+					<div ref={loadMoreRef} className="h-10 mt-12 flex justify-center items-center">
+						{loadingMore && (
+							<div className="flex items-center text-muted-foreground">
+								<div className="h-5 w-5 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></div>
+								<span>Loading more articles...</span>
+							</div>
+						)}
+						{!loadingMore && !pagination.hasMore && posts.length > 0 && (
+							<p className="text-muted-foreground">You've reached the end!</p>
+						)}
+					</div>
 				</div>
 			</section>
 

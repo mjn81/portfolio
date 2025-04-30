@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useCallback } from "react"
+import { useState, useRef, useCallback, KeyboardEvent } from "react"
 import {
   Bold,
   Italic,
@@ -17,6 +17,8 @@ import {
   AlignRight,
   Undo,
   Redo,
+  Maximize,
+  Minimize,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -25,7 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog"
 import { ImageGalleryPicker } from "@/components/admin/image-gallery-picker"
 
 interface RichTextEditorProps {
@@ -50,6 +52,7 @@ export function RichTextEditor({
   const [imageUrl, setImageUrl] = useState("")
   const [imageAlt, setImageAlt] = useState("")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [isFullScreen, setIsFullScreen] = useState(false)
 
   const getSelectedText = () => {
     if (!textareaRef.current) return ""
@@ -231,54 +234,93 @@ export function RichTextEditor({
     return html
   }
 
-  return (
-    <div className={cn("border rounded-md", className)}>
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "write" | "preview")}>
+  // Handle Tab key press in textarea
+  const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Tab') {
+      event.preventDefault(); // Prevent default focus change
+      const target = event.target as HTMLTextAreaElement;
+      const start = target.selectionStart;
+      const end = target.selectionEnd;
+      const tabCharacter = '\t'; // Or use spaces: '  ' or '    '
+
+      // Insert tab character at cursor position
+      target.value = target.value.substring(0, start) +
+                     tabCharacter +
+                     target.value.substring(end);
+
+      // Move cursor position after tab
+      target.selectionStart = target.selectionEnd = start + tabCharacter.length;
+
+      // Trigger onChange because the value was changed programmatically
+      onChange(target.value);
+    }
+  };
+
+  // Shared Editor Content (Toolbar + Write/Preview Tabs)
+  const EditorContent = ({isInModal = false}: {isInModal?: boolean}) => (
+    <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "write" | "preview")}>
         <div className="flex items-center justify-between border-b px-2">
-          <div className="flex flex-wrap gap-1 p-1">
-            <Button variant="ghost" size="icon" onClick={handleBold} title="Bold">
+          {/* Formatting Buttons Toolbar */} 
+          <div className="flex flex-wrap items-center gap-1 p-1">
+            <Button type="button" variant="ghost" size="icon" onClick={handleBold} title="Bold">
               <Bold className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={handleItalic} title="Italic">
+            <Button type="button" variant="ghost" size="icon" onClick={handleItalic} title="Italic">
               <Italic className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={handleHeading} title="Heading">
+            <Button type="button" variant="ghost" size="icon" onClick={handleHeading} title="Heading">
               <Heading2 className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={handleLink} title="Link">
+            <Button type="button" variant="ghost" size="icon" onClick={handleLink} title="Link">
               <Link className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={handleList} title="Bullet List">
-              <List className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={handleOrderedList} title="Numbered List">
-              <ListOrdered className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={handleCode} title="Code">
-              <Code className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={handleImage} title="Insert Image URL">
+            <Button type="button" variant="ghost" size="icon" onClick={handleImage} title="Image URL">
               <ImageIcon className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={handleGalleryImage} title="Browse Media Library">
-              <ImageIcon className="h-4 w-4 text-primary" />
+            <Button type="button" variant="ghost" size="icon" onClick={handleGalleryImage} title="Image from Gallery">
+              <ImageIcon className="h-4 w-4 text-blue-500" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={handleAlignLeft} title="Align Left">
+            <Button type="button" variant="ghost" size="icon" onClick={handleList} title="Unordered List">
+              <List className="h-4 w-4" />
+            </Button>
+            <Button type="button" variant="ghost" size="icon" onClick={handleOrderedList} title="Ordered List">
+              <ListOrdered className="h-4 w-4" />
+            </Button>
+            <Button type="button" variant="ghost" size="icon" onClick={handleCode} title="Code">
+              <Code className="h-4 w-4" />
+            </Button>
+            <Button type="button" variant="ghost" size="icon" onClick={handleAlignLeft} title="Align Left">
               <AlignLeft className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={handleAlignCenter} title="Align Center">
+            <Button type="button" variant="ghost" size="icon" onClick={handleAlignCenter} title="Align Center">
               <AlignCenter className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={handleAlignRight} title="Align Right">
+            <Button type="button" variant="ghost" size="icon" onClick={handleAlignRight} title="Align Right">
               <AlignRight className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={handleUndo} title="Undo">
+            <Button type="button" variant="ghost" size="icon" onClick={handleUndo} title="Undo">
               <Undo className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={handleRedo} title="Redo">
+            <Button type="button" variant="ghost" size="icon" onClick={handleRedo} title="Redo">
               <Redo className="h-4 w-4" />
             </Button>
+            {/* Add Fullscreen button only if NOT in modal */} 
+            {!isInModal && (
+                <Button type="button" variant="ghost" size="icon" onClick={() => setIsFullScreen(true)} title="Fullscreen">
+                    <Maximize className="h-4 w-4" />
+                </Button>
+            )}
+             {/* Add Close button only if IN modal */} 
+            {isInModal && (
+                <DialogClose asChild>
+                     <Button type="button" variant="ghost" size="icon" title="Exit Fullscreen">
+                        <Minimize className="h-4 w-4" /> 
+                    </Button>
+                </DialogClose>
+            )}
           </div>
+
+          {/* Write/Preview Tabs */} 
           <TabsList>
             <TabsTrigger value="write" className="flex items-center gap-1">
               <EyeOff className="h-4 w-4" /> Write
@@ -288,21 +330,35 @@ export function RichTextEditor({
             </TabsTrigger>
           </TabsList>
         </div>
+
+        {/* Write Tab Content */} 
         <TabsContent value="write" className="p-0 mt-0">
           <Textarea
-            ref={textareaRef}
+            ref={textareaRef} // Keep ref if needed, maybe use separate refs for normal/modal?
             value={value}
             onChange={(e) => onChange(e.target.value)}
+            onKeyDown={handleKeyDown} // <-- Add key down handler
             placeholder={placeholder}
-            className="min-h-[300px] resize-y border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+            className={cn(
+                "resize-y border-0 focus-visible:ring-0 focus-visible:ring-offset-0",
+                isInModal ? "min-h-[70vh] h-[75vh]" : "min-h-[300px]" // <-- Adjust height for modal
+            )}
           />
         </TabsContent>
-        <TabsContent value="preview" className="p-4 prose prose-sm max-w-none mt-0">
+
+        {/* Preview Tab Content */} 
+        <TabsContent value="preview" className={cn("p-4 prose prose-sm max-w-none mt-0", isInModal ? "min-h-[70vh] h-[75vh] overflow-y-auto" : "min-h-[300px]")}> 
           <div dangerouslySetInnerHTML={{ __html: markdownToHtml(value) }} />
         </TabsContent>
       </Tabs>
+  )
 
-      {/* Link Dialog */}
+  return (
+    <div className={cn("border rounded-md", className)}>
+      {/* Render standard editor */} 
+      <EditorContent isInModal={false} />
+
+      {/* Link Dialog */} 
       <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -329,17 +385,13 @@ export function RichTextEditor({
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setLinkDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={insertLink} disabled={!linkUrl}>
-              Insert
-            </Button>
+            <Button type="button" variant="outline" onClick={() => setLinkDialogOpen(false)}>Cancel</Button>
+            <Button type="button" onClick={insertLink}>Insert Link</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Image Dialog */}
+      {/* Image Dialog */} 
       <Dialog open={imageDialogOpen} onOpenChange={setImageDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -366,22 +418,26 @@ export function RichTextEditor({
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setImageDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={insertImage} disabled={!imageUrl}>
-              Insert
-            </Button>
+            <Button type="button" variant="outline" onClick={() => setImageDialogOpen(false)}>Cancel</Button>
+            <Button type="button" onClick={insertImage}>Insert Image</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Image Gallery Picker */}
+      {/* Image Gallery Picker */} 
       <ImageGalleryPicker
         open={galleryPickerOpen}
         onOpenChange={setGalleryPickerOpen}
         onSelectImage={insertGalleryImage}
       />
+
+      {/* Fullscreen Dialog */} 
+      <Dialog open={isFullScreen} onOpenChange={setIsFullScreen}>
+        <DialogContent className="max-w-[95vw] w-full h-[90vh] flex flex-col p-0 gap-0">
+          {/* Render editor content inside the modal */} 
+          <EditorContent isInModal={true} /> 
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

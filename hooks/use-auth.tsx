@@ -3,8 +3,8 @@
 import React, { useEffect, useState, ComponentType } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 
-
-interface User {
+// Export the User interface
+export interface User {
 	id: string;
 	email: string;
 	name: string;
