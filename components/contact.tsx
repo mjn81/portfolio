@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import { useState } from "react";
 
 import { motion } from "framer-motion"
 import { Caveat } from "next/font/google"
@@ -8,16 +9,75 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent } from "@/components/ui/card"
-import { Send, Mail, MapPin, Phone, Github, Linkedin, Twitter } from "lucide-react"
+import { useToast } from "@/components/ui/use-toast"
+import { Send, Mail, MapPin, Phone, Github, Linkedin, Twitter, Loader2 } from "lucide-react"
 import clsx from "clsx"
 
 const caveat = Caveat({ subsets: ["latin"] })
 
 const Contact = () => {
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    // Handle form submission
-  }
+  const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    subject: "",
+    message: "",
+  });
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { id, value } = e.target;
+    setFormData((prev) => ({ ...prev, [id]: value }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+         // Attempt to get specific error details if available
+        let errorDetail = result.error || 'Unknown error';
+        if (result.details) {
+          // Basic formatting for Zod errors (can be improved)
+          errorDetail = Object.entries(result.details)
+             .map(([field, fieldErrors]: [string, any]) => 
+               `${field}: ${fieldErrors._errors.join(', ')}`
+             )
+             .join('; ');
+        }
+        throw new Error(errorDetail);
+      }
+
+      // Success
+      toast({
+        title: "Message Sent!",
+        description: "Thank you for contacting me. I'll get back to you soon.",
+      });
+      // Clear form
+      setFormData({ name: "", email: "", subject: "", message: "" });
+
+    } catch (error: any) {
+      console.error("Contact form submission error:", error);
+      toast({
+        title: "Submission Failed",
+        description: error.message || "Could not send message. Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const contactInfo = [
     {
@@ -139,7 +199,15 @@ const Contact = () => {
                       <label htmlFor="name" className="text-sm font-medium">
                         Your Name
                       </label>
-                      <Input id="name" placeholder="John Doe" required className="bg-background/50" />
+                      <Input
+                        id="name"
+                        placeholder="John Doe"
+                        required
+                        className="bg-background/50"
+                        value={formData.name}
+                        onChange={handleInputChange}
+                        disabled={isSubmitting}
+                      />
                     </div>
                     <div className="space-y-2">
                       <label htmlFor="email" className="text-sm font-medium">
@@ -151,6 +219,9 @@ const Contact = () => {
                         placeholder="john@example.com"
                         required
                         className="bg-background/50"
+                        value={formData.email}
+                        onChange={handleInputChange}
+                        disabled={isSubmitting}
                       />
                     </div>
                   </div>
@@ -158,7 +229,15 @@ const Contact = () => {
                     <label htmlFor="subject" className="text-sm font-medium">
                       Subject
                     </label>
-                    <Input id="subject" placeholder="How can I help you?" required className="bg-background/50" />
+                    <Input
+                      id="subject"
+                      placeholder="How can I help you?"
+                      required
+                      className="bg-background/50"
+                      value={formData.subject}
+                      onChange={handleInputChange}
+                      disabled={isSubmitting}
+                    />
                   </div>
                   <div className="space-y-2">
                     <label htmlFor="message" className="text-sm font-medium">
@@ -170,11 +249,18 @@ const Contact = () => {
                       rows={5}
                       required
                       className="bg-background/50"
+                      value={formData.message}
+                      onChange={handleInputChange}
+                      disabled={isSubmitting}
                     />
                   </div>
-                  <Button type="submit" className="w-full group">
-                    Send Message
-                    <Send className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                  <Button type="submit" className="w-full group" disabled={isSubmitting}>
+                    {isSubmitting ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="mr-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                    )}
+                    {isSubmitting ? "Sending..." : "Send Message"}
                   </Button>
                 </form>
               </CardContent>

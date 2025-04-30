@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useCallback, KeyboardEvent } from "react"
+import { useState, useRef, useCallback, KeyboardEvent, RefObject } from "react"
 import {
   Bold,
   Italic,
@@ -51,21 +51,28 @@ export function RichTextEditor({
   const [linkText, setLinkText] = useState("")
   const [imageUrl, setImageUrl] = useState("")
   const [imageAlt, setImageAlt] = useState("")
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const textareaRefNormal = useRef<HTMLTextAreaElement>(null)
+  const textareaRefModal = useRef<HTMLTextAreaElement>(null)
   const [isFullScreen, setIsFullScreen] = useState(false)
 
+  const getActiveTextareaRef = (): RefObject<HTMLTextAreaElement | null> => {
+    return isFullScreen ? textareaRefModal : textareaRefNormal;
+  }
+
   const getSelectedText = () => {
-    if (!textareaRef.current) return ""
-    const start = textareaRef.current.selectionStart
-    const end = textareaRef.current.selectionEnd
+    const activeRef = getActiveTextareaRef();
+    if (!activeRef.current) return ""
+    const start = activeRef.current.selectionStart
+    const end = activeRef.current.selectionEnd
     return value.substring(start, end)
   }
 
   const insertText = (before: string, after = "") => {
-    if (!textareaRef.current) return
+    const activeRef = getActiveTextareaRef();
+    if (!activeRef.current) return
 
-    const start = textareaRef.current.selectionStart
-    const end = textareaRef.current.selectionEnd
+    const start = activeRef.current.selectionStart
+    const end = activeRef.current.selectionEnd
     const selectedText = value.substring(start, end)
     const newText = value.substring(0, start) + before + selectedText + after + value.substring(end)
 
@@ -73,10 +80,11 @@ export function RichTextEditor({
 
     // Set cursor position after insertion
     setTimeout(() => {
-      if (!textareaRef.current) return
+      const refToFocus = getActiveTextareaRef(); // Re-check which ref is active
+      if (!refToFocus.current) return
       const newCursorPos = start + before.length + selectedText.length + after.length
-      textareaRef.current.focus()
-      textareaRef.current.setSelectionRange(newCursorPos, newCursorPos)
+      refToFocus.current.focus()
+      refToFocus.current.setSelectionRange(newCursorPos, newCursorPos)
     }, 0)
   }
 
@@ -185,45 +193,37 @@ export function RichTextEditor({
   }
 
   const handleUndo = () => {
-    if (textareaRef.current) {
-      textareaRef.current.focus()
+    const activeRef = getActiveTextareaRef();
+    if (activeRef.current) {
+      activeRef.current.focus()
       document.execCommand("undo")
     }
   }
 
   const handleRedo = () => {
-    if (textareaRef.current) {
-      textareaRef.current.focus()
+    const activeRef = getActiveTextareaRef();
+    if (activeRef.current) {
+      activeRef.current.focus()
       document.execCommand("redo")
     }
   }
 
-  // Simple Markdown to HTML conversion for preview
   const markdownToHtml = (markdown: string) => {
     let html = markdown
-      // Convert headers
       .replace(/^### (.*$)/gm, "<h3>$1</h3>")
       .replace(/^## (.*$)/gm, "<h2>$1</h2>")
       .replace(/^# (.*$)/gm, "<h1>$1</h1>")
-      // Convert bold and italic
       .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
       .replace(/\*(.*?)\*/g, "<em>$1</em>")
-      // Convert links
       .replace(/\[(.*?)\]$$(.*?)$$/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
-      // Convert images
       .replace(/!\[(.*?)\]$$(.*?)$$/g, '<img src="$2" alt="$1" style="max-width: 100%; height: auto;" />')
-      // Convert lists
       .replace(/^\s*- (.*$)/gm, "<li>$1</li>")
       .replace(/^\s*\d+\. (.*$)/gm, "<li>$1</li>")
-      // Convert code
       .replace(/`(.*?)`/g, "<code>$1</code>")
-      // Convert paragraphs
       .replace(/\n\n/g, "</p><p>")
 
-    // Wrap in paragraph tags
     html = "<p>" + html + "</p>"
 
-    // Fix lists
     html = html.replace(/<li>(.*?)<\/li>/g, (match) => {
       if (html.indexOf("<ul>") === -1) {
         return "<ul>" + match + "</ul>"
@@ -234,33 +234,44 @@ export function RichTextEditor({
     return html
   }
 
-  // Handle Tab key press in textarea
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    console.log("Key down:", event.key, "in", isFullScreen ? "modal" : "normal"); // Updated log
+
     if (event.key === 'Tab') {
+      console.log("Tab key pressed. Preventing default and stopping propagation..."); // Updated log
       event.preventDefault(); // Prevent default focus change
+      event.stopPropagation(); // Prevent event from bubbling up (e.g., to Dialog)
+
+      // --- Restore value manipulation ---
       const target = event.target as HTMLTextAreaElement;
       const start = target.selectionStart;
       const end = target.selectionEnd;
-      const tabCharacter = '\t'; // Or use spaces: '  ' or '    '
+      const tabCharacter = '\t';
 
-      // Insert tab character at cursor position
-      target.value = target.value.substring(0, start) +
-                     tabCharacter +
-                     target.value.substring(end);
+      const currentValue = target.value;
+      const newValue = currentValue.substring(0, start) + tabCharacter + currentValue.substring(end);
+      onChange(newValue);
 
-      // Move cursor position after tab
-      target.selectionStart = target.selectionEnd = start + tabCharacter.length;
+      // Use timeout for cursor positioning after state update
+      setTimeout(() => {
+         // Ensure the target still exists and is focused (might lose focus briefly on re-render)
+         if (document.activeElement === target) {
+             target.selectionStart = target.selectionEnd = start + tabCharacter.length;
+         }
+      }, 0);
+      // --- End restored code ---
 
-      // Trigger onChange because the value was changed programmatically
-      onChange(target.value);
+    } else if (event.key === 'Backspace') {
+      console.log("Backspace key pressed.");
+      // Still check if Backspace is causing issues
+      // We could add stopPropagation here too if needed, but it's less common
+      // event.stopPropagation();
     }
   };
 
-  // Shared Editor Content (Toolbar + Write/Preview Tabs)
-  const EditorContent = ({isInModal = false}: {isInModal?: boolean}) => (
+  const EditorContent = ({isInModal = false, textareaRef}: {isInModal?: boolean, textareaRef: RefObject<HTMLTextAreaElement | null>}) => (
     <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "write" | "preview")}>
         <div className="flex items-center justify-between border-b px-2">
-          {/* Formatting Buttons Toolbar */} 
           <div className="flex flex-wrap items-center gap-1 p-1">
             <Button type="button" variant="ghost" size="icon" onClick={handleBold} title="Bold">
               <Bold className="h-4 w-4" />
@@ -304,13 +315,11 @@ export function RichTextEditor({
             <Button type="button" variant="ghost" size="icon" onClick={handleRedo} title="Redo">
               <Redo className="h-4 w-4" />
             </Button>
-            {/* Add Fullscreen button only if NOT in modal */} 
             {!isInModal && (
                 <Button type="button" variant="ghost" size="icon" onClick={() => setIsFullScreen(true)} title="Fullscreen">
                     <Maximize className="h-4 w-4" />
                 </Button>
             )}
-             {/* Add Close button only if IN modal */} 
             {isInModal && (
                 <DialogClose asChild>
                      <Button type="button" variant="ghost" size="icon" title="Exit Fullscreen">
@@ -320,7 +329,6 @@ export function RichTextEditor({
             )}
           </div>
 
-          {/* Write/Preview Tabs */} 
           <TabsList>
             <TabsTrigger value="write" className="flex items-center gap-1">
               <EyeOff className="h-4 w-4" /> Write
@@ -331,22 +339,20 @@ export function RichTextEditor({
           </TabsList>
         </div>
 
-        {/* Write Tab Content */} 
         <TabsContent value="write" className="p-0 mt-0">
           <Textarea
-            ref={textareaRef} // Keep ref if needed, maybe use separate refs for normal/modal?
+            ref={textareaRef}
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            onKeyDown={handleKeyDown} // <-- Add key down handler
+            onKeyDown={handleKeyDown}
             placeholder={placeholder}
             className={cn(
                 "resize-y border-0 focus-visible:ring-0 focus-visible:ring-offset-0",
-                isInModal ? "min-h-[70vh] h-[75vh]" : "min-h-[300px]" // <-- Adjust height for modal
+                isInModal ? "min-h-[70vh] h-[75vh]" : "min-h-[300px]"
             )}
           />
         </TabsContent>
 
-        {/* Preview Tab Content */} 
         <TabsContent value="preview" className={cn("p-4 prose prose-sm max-w-none mt-0", isInModal ? "min-h-[70vh] h-[75vh] overflow-y-auto" : "min-h-[300px]")}> 
           <div dangerouslySetInnerHTML={{ __html: markdownToHtml(value) }} />
         </TabsContent>
@@ -355,10 +361,8 @@ export function RichTextEditor({
 
   return (
     <div className={cn("border rounded-md", className)}>
-      {/* Render standard editor */} 
-      <EditorContent isInModal={false} />
+      <EditorContent isInModal={false} textareaRef={textareaRefNormal} />
 
-      {/* Link Dialog */} 
       <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -391,7 +395,6 @@ export function RichTextEditor({
         </DialogContent>
       </Dialog>
 
-      {/* Image Dialog */} 
       <Dialog open={imageDialogOpen} onOpenChange={setImageDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -424,18 +427,15 @@ export function RichTextEditor({
         </DialogContent>
       </Dialog>
 
-      {/* Image Gallery Picker */} 
       <ImageGalleryPicker
         open={galleryPickerOpen}
         onOpenChange={setGalleryPickerOpen}
         onSelectImage={insertGalleryImage}
       />
 
-      {/* Fullscreen Dialog */} 
       <Dialog open={isFullScreen} onOpenChange={setIsFullScreen}>
         <DialogContent className="max-w-[95vw] w-full h-[90vh] flex flex-col p-0 gap-0">
-          {/* Render editor content inside the modal */} 
-          <EditorContent isInModal={true} /> 
+          <EditorContent isInModal={true} textareaRef={textareaRefModal} /> 
         </DialogContent>
       </Dialog>
     </div>
