@@ -24,7 +24,7 @@ export const metadata: Metadata = {
     siteName: 'Mohammad Javad Najafi',
     images: [
       {
-        url: '/opengraph-image.jpg',
+        url: '/opengraph-image.jpeg',
         width: 1200,
         height: 630,
         alt: 'Mohammad Javad Najafi Portfolio',
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Mohammad Javad Najafi | Software & AI Engineer',
     description: 'Portfolio of Mohammad Javad Najafi, Senior Software and AI Engineer',
-    images: ['/opengraph-image.jpg'],
+    images: ['/opengraph-image.jpeg'],
   },
   robots: {
     index: true,

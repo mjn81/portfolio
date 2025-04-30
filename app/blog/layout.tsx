@@ -15,7 +15,7 @@ export const metadata: Metadata = {
         siteName: 'Mohammad Javad Najafi',
         images: [
             {
-                url: '/opengraph-image.jpg',
+                url: '/opengraph-image.jpeg',
                 width: 1200,
                 height: 630,
                 alt: 'Blog - Mohammad Javad Najafi',
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
         card: 'summary_large_image',
         title: 'Blog - Mohammad Javad Najafi',
         description: 'Read the latest articles and insights on software engineering, AI, and technology from Mohammad Javad Najafi.',
-        images: ['/opengraph-image.jpg'],
+        images: ['/opengraph-image.jpeg'],
     },
     robots: {
         index: true,
