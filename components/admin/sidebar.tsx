@@ -15,6 +15,7 @@ import {
   Layers,
   Sun,
   Moon,
+  Loader2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/hooks/use-auth"
@@ -41,9 +42,30 @@ export function AdminSidebar() {
   const { logout, profile } = useAuth()
   const { theme, setTheme } = useTheme()
   const [isMounted, setIsMounted] = useState(false)
+  const [postCount, setPostCount] = useState<number | null>(null)
+  const [isLoadingCount, setIsLoadingCount] = useState(true)
 
   useEffect(() => {
     setIsMounted(true)
+
+    const fetchCount = async () => {
+      setIsLoadingCount(true)
+      try {
+        const response = await fetch('/api/posts/count')
+        if (!response.ok) {
+          throw new Error('Failed to fetch count')
+        }
+        const data = await response.json()
+        setPostCount(data.count ?? 0)
+      } catch (error) {
+        console.error("Error fetching post count:", error)
+        setPostCount(null)
+      } finally {
+        setIsLoadingCount(false)
+      }
+    }
+
+    fetchCount()
   }, [])
 
   const isActive = (path: string) => {
@@ -105,8 +127,14 @@ export function AdminSidebar() {
                 <Link href="/admin/posts" className="flex items-center gap-2">
                   <FileText className="h-4 w-4 shrink-0" />
                   <span className="truncate">Posts</span>
-                  <Badge className="ml-auto text-xs py-0 px-1.5 h-5 bg-muted text-muted-foreground" variant="secondary">
-                    5
+                  <Badge className="ml-auto text-xs py-0 px-1.5 h-5 bg-muted text-muted-foreground min-w-[20px] flex items-center justify-center" variant="secondary">
+                    {isLoadingCount ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : postCount !== null ? (
+                      postCount
+                    ) : (
+                      '?'
+                    )}
                   </Badge>
                 </Link>
               </SidebarMenuButton>
