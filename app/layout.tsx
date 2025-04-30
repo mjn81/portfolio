@@ -8,9 +8,52 @@ import { Toaster } from "@/components/ui/toaster"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Mohammad Javad Najafi | Software & AI Engineer",
+  title: {
+    template: '%s | Mohammad Javad Najafi',
+    default: 'Mohammad Javad Najafi | Software & AI Engineer',
+  },
   description: "Portfolio of Mohammad Javad Najafi, Senior Software and AI Engineer",
-    generator: 'v0.dev'
+  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'),
+  keywords: [
+    'Mohammad Javad Najafi', 'Software Engineer', 'AI Engineer', 'Portfolio', 'Machine Learning', 'Full Stack', 'React', 'Next.js', 'TypeScript', 'Node.js', 'Supabase', 'OpenAI', 'Blog', 'Tech', 'Startup', 'Innovation'
+  ],
+  openGraph: {
+    title: 'Mohammad Javad Najafi | Software & AI Engineer',
+    description: 'Portfolio of Mohammad Javad Najafi, Senior Software and AI Engineer',
+    url: '/',
+    siteName: 'Mohammad Javad Najafi',
+    images: [
+      {
+        url: '/opengraph-image.jpg',
+        width: 1200,
+        height: 630,
+        alt: 'Mohammad Javad Najafi Portfolio',
+      },
+    ],
+    locale: 'en_US',
+    type: 'website',
+  },
+  alternates: {
+    canonical: '/',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Mohammad Javad Najafi | Software & AI Engineer',
+    description: 'Portfolio of Mohammad Javad Najafi, Senior Software and AI Engineer',
+    images: ['/opengraph-image.jpg'],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      noimageindex: false,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
 }
 
 export default function RootLayout({
