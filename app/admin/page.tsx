@@ -102,8 +102,7 @@ function AdminDashboard() {
   const [statsError, setStatsError] = useState<string | null>(null);
   const [recentError, setRecentError] = useState<string | null>(null);
   const [scheduledError, setScheduledError] = useState<string | null>(null);
-  const [gaSummaryError, setGaSummaryError] = useState<string | null>(null);
-  const [gaDailyError, setGaDailyError] = useState<string | null>(null);
+  const [gaError, setGaError] = useState<string | null>(null);
 
   // Data states
   const [postStats, setPostStats] = useState<PostStats>({ total: 0, published: 0, draft: 0, scheduled: 0 });
@@ -111,8 +110,6 @@ function AdminDashboard() {
   const [scheduledPosts, setScheduledPosts] = useState<Post[]>([]);
   const [gaSummary, setGaSummary] = useState<GaSummaryStats | null>(null);
   const [gaDaily, setGaDaily] = useState<GaDailyData[]>([]);
-  const [gaPlaceholder, setGaPlaceholder] = useState(false);
-  const [gaMessage, setGaMessage] = useState<string | null>(null);
 
   // UI states
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -128,10 +125,7 @@ function AdminDashboard() {
     setStatsError(null);
     setRecentError(null);
     setScheduledError(null);
-    setGaSummaryError(null);
-    setGaDailyError(null);
-    setGaPlaceholder(false);
-    setGaMessage(null);
+    setGaError(null);
 
     try {
       // Fetch Post Stats
@@ -173,33 +167,53 @@ function AdminDashboard() {
     }
 
     // Fetch GA Data (Placeholders)
+    let summaryError = null;
+    let dailyError = null;
+    let consolidatedErrorMessage = null;
+
+    // Fetch GA Summary
     try {
       const gaSummaryRes = await fetch('/api/stats/ga?metric=summary&range=30day');
-      if (!gaSummaryRes.ok) throw new Error('Failed to fetch GA summary');
       const gaSummaryData = await gaSummaryRes.json();
-      setGaSummary(gaSummaryData.data);
-      setGaPlaceholder(gaSummaryData.placeholder || false);
-      setGaMessage(gaSummaryData.message || null);
+      if (!gaSummaryRes.ok || gaSummaryData.placeholder) { // Check placeholder flag from API
+          summaryError = gaSummaryData.message || 'Failed to fetch GA summary';
+          console.warn("GA Summary Error/Placeholder:", summaryError);
+          setGaSummary(null); // Ensure summary is null on error
+      } else {
+          setGaSummary(gaSummaryData.data);
+      }
     } catch (error: any) {
+      summaryError = error.message || 'Could not load GA summary data.';
       console.error("Error fetching GA summary:", error);
-      setGaSummaryError(error.message || 'Could not load GA summary data.');
+       setGaSummary(null);
     } finally {
       setIsLoadingGaSummary(false);
     }
 
+    // Fetch GA Daily
     try {
       const gaDailyRes = await fetch('/api/stats/ga?metric=daily&range=14day');
-      if (!gaDailyRes.ok) throw new Error('Failed to fetch daily GA data');
       const gaDailyData = await gaDailyRes.json();
-      setGaDaily(gaDailyData.data || []);
-      // Placeholder flag and message are likely the same as summary, but check just in case
-      if (!gaPlaceholder) setGaPlaceholder(gaDailyData.placeholder || false);
-      if (!gaMessage) setGaMessage(gaDailyData.message || null);
+      if (!gaDailyRes.ok || gaDailyData.placeholder) { // Check placeholder flag from API
+          dailyError = gaDailyData.message || 'Failed to fetch daily GA data';
+          console.warn("GA Daily Error/Placeholder:", dailyError);
+          setGaDaily([]); // Ensure daily is empty array on error
+      } else {
+          setGaDaily(gaDailyData.data || []);
+      }
     } catch (error: any) {
+      dailyError = error.message || 'Could not load daily GA data.';
       console.error("Error fetching daily GA data:", error);
-      setGaDailyError(error.message || 'Could not load daily GA data.');
+       setGaDaily([]);
     } finally {
       setIsLoadingGaDaily(false);
+    }
+
+    // Consolidate GA errors for UI display
+    if (summaryError || dailyError) {
+        consolidatedErrorMessage = summaryError || dailyError; // Show first error encountered
+        // Make specific if needed: e.g., `Summary: ${summaryError}. Daily: ${dailyError}`
+        setGaError(consolidatedErrorMessage);
     }
 
   }, []);
@@ -292,14 +306,15 @@ function AdminDashboard() {
         </div>
       </div>
 
-      {/* GA Placeholder Message */}
-      {gaPlaceholder && gaMessage && (
-        <Alert variant="default" className="bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800">
-            <Info className="h-4 w-4 !text-blue-600 dark:!text-blue-400" />
-          <AlertTitle className="text-blue-800 dark:text-blue-300">Google Analytics</AlertTitle>
-          <AlertDescription className="text-blue-700 dark:text-blue-400">
-            {gaMessage} Some stats below are showing placeholder values (0).
-            Configure Google Analytics integration to see real data.
+      {/* GA Error Alert - Display if gaError state is set */}
+      {gaError && (
+        <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Google Analytics Error</AlertTitle>
+          <AlertDescription>
+            {gaError}
+            {gaError.includes("Configuration Issue") && " Please check your environment variables and service account permissions."} 
+            {gaError.includes("Failed to fetch GA data") && " The API returned an error. It might be temporary or require investigation."}
           </AlertDescription>
         </Alert>
       )}
@@ -314,23 +329,21 @@ function AdminDashboard() {
           description={isLoadingStats ? <Skeleton className="h-4 w-32" /> : `${postStats.published} published, ${postStats.draft} drafts, ${postStats.scheduled} scheduled`}
           error={statsError}
         />
-        {/* Total Views (GA Placeholder) */}
+        {/* Total Views (GA) */}
         <StatCard
           title="Total Views (GA)"
           value={isLoadingGaSummary ? <Skeleton className="h-6 w-20" /> : (gaSummary?.views ?? 0).toLocaleString()}
           icon={<Eye className="text-blue-500" />}
           description={isLoadingGaSummary ? <Skeleton className="h-4 w-24" /> : "All-time page views"}
-          error={gaSummaryError}
-          isPlaceholder={gaPlaceholder}
+          error={gaError}
         />
-        {/* Unique Visitors (GA Placeholder) */}
+        {/* Unique Visitors (GA) */}
         <StatCard
           title="Unique Visitors (GA)"
           value={isLoadingGaSummary ? <Skeleton className="h-6 w-16" /> : (gaSummary?.visitors ?? 0).toLocaleString()}
           icon={<Users className="text-purple-500" />}
           description={isLoadingGaSummary ? <Skeleton className="h-4 w-20" /> : "Last 30 days"}
-          error={gaSummaryError}
-          isPlaceholder={gaPlaceholder}
+          error={gaError}
         />
         {/* Placeholder for another metric or Quick Action */}
         <Card>
@@ -360,12 +373,12 @@ function AdminDashboard() {
 
       {/* Main Content Area */}
       <div className="grid gap-6 md:grid-cols-6">
-        {/* Traffic Overview Chart (GA Placeholder) */}
+        {/* Traffic Overview Chart (GA) */}
         <Card className="md:col-span-4">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <div>
               <CardTitle>Traffic Overview (GA)</CardTitle>
-              <CardDescription>Daily views and visitors (placeholder)</CardDescription>
+              <CardDescription>Daily views and visitors</CardDescription>
             </div>
             <Tabs value={activeTrafficTab} onValueChange={setActiveTrafficTab}>
               <TabsList className="grid w-[200px] grid-cols-2">
@@ -380,9 +393,9 @@ function AdminDashboard() {
                   <div className="flex h-full w-full items-center justify-center">
                       <Loader2 className="h-8 w-8 animate-spin text-muted-foreground"/>
                   </div>
-              ) : gaDailyError ? (
+              ) : gaError ? (
                    <div className="flex h-full w-full items-center justify-center text-destructive">
-                      <AlertTriangle className="mr-2 h-4 w-4" /> {gaDailyError}
+                      <AlertTriangle className="mr-2 h-4 w-4" /> Failed to load daily data.
                    </div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
@@ -406,7 +419,6 @@ function AdminDashboard() {
                       tick={{ fontSize: 12 }}
                       tickLine={false}
                       axisLine={false}
-                      tickFormatter={(value) => new Date(value).getDate().toString()}
                     />
                     <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
                     <Tooltip content={<ChartTooltip />} />
@@ -438,7 +450,7 @@ function AdminDashboard() {
             </div>
           </CardContent>
           <CardFooter className="flex justify-between text-sm text-muted-foreground">
-            <div>{gaPlaceholder ? "Placeholder data (14 days)" : "Updated just now (14 days)"}</div>
+            <div>Last 14 days data</div>
           </CardFooter>
         </Card>
 
@@ -590,13 +602,7 @@ function AdminDashboard() {
           </CardContent>
         </Card>
 
-        {/* Remove Performance Metrics Card (relies on GA) */}
-        {/* <Card className="md:col-span-2"> ... </Card> */}
-
-        {/* Remove Upcoming Schedule Card (we have scheduled posts list now) */}
-        {/* <Card className="md:col-span-2"> ... </Card> */}
-
-        {/* Keep Quick Actions Card - Maybe simplify? */}
+        {/* Quick Actions Card - unchanged */}
         <Card className="md:col-span-3">
           <CardHeader>
             <CardTitle>Quick Actions</CardTitle>
@@ -630,7 +636,7 @@ function AdminDashboard() {
           </CardContent>
         </Card>
 
-         {/* Placeholder for other content or another quick links card */}
+         {/* System Status Card - Update GA Status logic */}
          <Card className="md:col-span-3">
              <CardHeader>
                  <CardTitle>System Status</CardTitle>
@@ -647,9 +653,9 @@ function AdminDashboard() {
                  </div>
                   <div className="flex items-center justify-between text-sm">
                      <span>GA Status:</span>
-                     {gaPlaceholder ? (
-                        <Badge variant="secondary">Not Configured</Badge>
-                     ) : (gaSummaryError || gaDailyError) ? (
+                     {isLoadingGaSummary || isLoadingGaDaily ? (
+                         <Badge variant="secondary"><Loader2 className="h-3 w-3 animate-spin mr-1 inline"/> Loading...</Badge>
+                     ) : gaError ? (
                         <Badge variant="destructive">Error</Badge>
                      ) : (
                         <Badge variant="outline" className="border-green-500 text-green-600">Connected</Badge>

@@ -10,6 +10,7 @@ export async function GET(
 	request: NextRequest,
 	{ params }: { params: { id: string } }
 ) {
+	const paramId = await params.id;
 	const { data, error } = await supabase
 		.from('posts')
 		.select(`
@@ -22,7 +23,7 @@ export async function GET(
                 )
             )
         `)
-		.eq('id', params.id)
+		.eq('id', paramId)
 		.single();
 
 	if (error) {
@@ -59,6 +60,7 @@ export async function PUT(
 	{ params }: { params: { id: string } }
 ) {
 	try {
+		const paramId = await params.id;
 		const token = (await cookies()).get('token')?.value;
 		if (!token) {
 			return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -113,7 +115,7 @@ export async function PUT(
 		const { data: updatedPost, error: updateError } = await supabase
 			.from('posts')
 			.update(postUpdateData) // Use the processed update data
-			.eq('id', params.id)
+			.eq('id', paramId)
 			.select('id')
 			.single();
 
@@ -194,6 +196,7 @@ export async function DELETE(
 	request: NextRequest,
 	{ params }: { params: { id: string } }
 ) {
+	const paramId = await params.id;
 	const token = (await cookies()).get('token')?.value;
 	if (!token) {
 		return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -209,7 +212,7 @@ export async function DELETE(
 	const { data: postData, error: fetchError } = await supabase
 		.from('posts')
 		.select('author')
-		.eq('id', params.id)
+		.eq('id', paramId)
 		.single();
 
 	if (fetchError) {
@@ -230,7 +233,7 @@ export async function DELETE(
 	}
 
 	// 3. Proceed with deletion
-	const { error: deleteError } = await supabase.from('posts').delete().eq('id', params.id);
+	const { error: deleteError } = await supabase.from('posts').delete().eq('id', paramId);
 
 	if (deleteError) {
 		return NextResponse.json({ error: deleteError.message }, { status: 500 });

@@ -15,6 +15,7 @@ export async function GET(
 	request: NextRequest,
 	{ params }: { params: { id: string } }
 ) {
+	const paramId = await params.id;
 	// user authentication only
 	const token = (await cookies()).get('token')?.value;
 
@@ -31,7 +32,7 @@ export async function GET(
 	const { data, error } = await supabase
 		.from('users')
 		.select('*')
-		.eq('id', params.id)
+		.eq('id', paramId)
 		.single();
 
 	if (error) {

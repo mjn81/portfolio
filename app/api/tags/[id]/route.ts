@@ -8,6 +8,7 @@ export async function DELETE(
 	{ params }: { params: { id: string } }
 ) {
 	try {
+		const paramId = await params.id;
 		// Retrieve the token from cookies
 		const token = (await cookies()).get('token')?.value;
 
@@ -27,7 +28,7 @@ export async function DELETE(
 		const { data, error } = await supabase
 			.from('tags')
 			.delete()
-			.eq('id', params.id)
+			.eq('id', paramId)
 			.select();
 
 		if (error) {

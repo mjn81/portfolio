@@ -36,7 +36,7 @@ export function StatCard({ title, value, icon, description, trend, className, er
         ) : (
           <>
             <div className="text-2xl font-bold">{value}</div>
-            {description && <p className="text-xs text-muted-foreground">{description}</p>}
+            {description && <div className="text-xs text-muted-foreground">{description}</div>}
             {trend && (
               <div className="mt-2 flex items-center text-xs">
                 <span
