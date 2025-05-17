@@ -5,10 +5,10 @@ import jwt from 'jsonwebtoken';
 
 export async function DELETE(
 	request: NextRequest,
-	{ params }: { params: { id: string } }
+	{ params }: { params: Promise<{ id: string }> }
 ) {
 	try {
-		const paramId = await params.id;
+		const paramId = (await params).id;
 		// Retrieve the token from cookies
 		const token = (await cookies()).get('token')?.value;
 

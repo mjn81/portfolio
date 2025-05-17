@@ -8,9 +8,9 @@ import { generateSlug } from '@/lib/utils';
 
 export async function GET(
 	request: NextRequest,
-	{ params }: { params: { id: string } }
+	{ params }: { params: Promise<{ id: string }> }
 ) {
-	const paramId = await params.id;
+	const paramId = (await params).id;
 	const { data, error } = await supabase
 		.from('posts')
 		.select(`
@@ -57,10 +57,10 @@ export async function GET(
 
 export async function PUT(
 	request: NextRequest,
-	{ params }: { params: { id: string } }
+	{ params }: { params: Promise<{ id: string }> }
 ) {
 	try {
-		const paramId = await params.id;
+		const paramId = (await params).id;
 		const token = (await cookies()).get('token')?.value;
 		if (!token) {
 			return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -85,12 +85,15 @@ export async function PUT(
 		const { tags, ...postUpdateDataFromSchema } = parsed.data;
 
 		// Prepare the final update object for the database (using snake_case)
-		const postUpdateData: { [key: string]: any } = { ...postUpdateDataFromSchema };
+		const postUpdateData: { [key: string]: any } = {
+			...postUpdateDataFromSchema,
+		};
 
 		// Map scheduledPublishTime from schema (camelCase) to database column (snake_case)
 		// Important: Only include if it was actually in the parsed data
 		if (postUpdateDataFromSchema.hasOwnProperty('scheduledPublishTime')) {
-			postUpdateData.scheduled_publish_time = postUpdateDataFromSchema.scheduledPublishTime;
+			postUpdateData.scheduled_publish_time =
+				postUpdateDataFromSchema.scheduledPublishTime;
 			// Remove the camelCase version if you want to be strict, though Supabase might ignore it
 			// delete postUpdateData.scheduledPublishTime;
 		}
@@ -100,17 +103,20 @@ export async function PUT(
 			postUpdateData.published_at = new Date().toISOString(); // Use snake_case
 			postUpdateData.scheduled_publish_time = null; // Use snake_case & ensure it's null
 		} else if (postUpdateData.status === 'draft') {
-			 // Optional: Clear published_at if moving back to draft?
-			 // postUpdateData.published_at = null;
-		} else if (postUpdateData.status === 'scheduled' && postUpdateData.scheduled_publish_time !== undefined) {
-			 // If moving to scheduled (and time is provided), clear published_at
-			 postUpdateData.published_at = null; // Use snake_case
+			// Optional: Clear published_at if moving back to draft?
+			// postUpdateData.published_at = null;
+		} else if (
+			postUpdateData.status === 'scheduled' &&
+			postUpdateData.scheduled_publish_time !== undefined
+		) {
+			// If moving to scheduled (and time is provided), clear published_at
+			postUpdateData.published_at = null; // Use snake_case
 		}
 
 		// --- Update Post Table ---
 		// Remove fields not directly in the 'posts' table before update
 		// (e.g., remove scheduledPublishTime if you didn't delete it earlier)
-		delete postUpdateData.scheduledPublishTime; 
+		delete postUpdateData.scheduledPublishTime;
 
 		const { data: updatedPost, error: updateError } = await supabase
 			.from('posts')
@@ -123,7 +129,7 @@ export async function PUT(
 			if (updateError.code === 'PGRST116') {
 				return NextResponse.json({ error: 'Post not found' }, { status: 404 });
 			}
-			console.error("Error updating post:", updateError);
+			console.error('Error updating post:', updateError);
 			return NextResponse.json({ error: updateError.message }, { status: 500 });
 		}
 
@@ -136,17 +142,19 @@ export async function PUT(
 				.eq('post_id', postId);
 
 			if (deleteTagsError) {
-				console.error("Error deleting old tags:", deleteTagsError);
+				console.error('Error deleting old tags:', deleteTagsError);
 			}
 
-			const tagsToCreate = tags.filter(tag => !tag.id);
-			const existingTagIds = tags.filter(tag => tag.id).map(tag => tag.id as string);
+			const tagsToCreate = tags.filter((tag) => !tag.id);
+			const existingTagIds = tags
+				.filter((tag) => tag.id)
+				.map((tag) => tag.id as string);
 			let newTagIds: string[] = [];
 
 			if (tagsToCreate.length > 0) {
-				const newTagsData = tagsToCreate.map(tag => ({
+				const newTagsData = tagsToCreate.map((tag) => ({
 					name: tag.name,
-					slug: generateSlug(tag.name)
+					slug: generateSlug(tag.name),
 				}));
 				const { data: createdTags, error: createTagsError } = await supabase
 					.from('tags')
@@ -154,22 +162,25 @@ export async function PUT(
 					.select('id');
 
 				if (createTagsError) {
-					console.error("Error creating new tags:", createTagsError);
+					console.error('Error creating new tags:', createTagsError);
 				} else {
-					newTagIds = createdTags?.map(tag => tag.id) || [];
+					newTagIds = createdTags?.map((tag) => tag.id) || [];
 				}
 			}
 
 			const allTagIds = [...existingTagIds, ...newTagIds];
 
 			if (allTagIds.length > 0) {
-				const postTagsData = allTagIds.map(tagId => ({ post_id: postId, tag_id: tagId }));
+				const postTagsData = allTagIds.map((tagId) => ({
+					post_id: postId,
+					tag_id: tagId,
+				}));
 				const { error: insertTagsError } = await supabase
 					.from('post_tags')
 					.insert(postTagsData);
 
 				if (insertTagsError) {
-					console.error("Error inserting new tags:", insertTagsError);
+					console.error('Error inserting new tags:', insertTagsError);
 				}
 			}
 		} else {
@@ -178,13 +189,19 @@ export async function PUT(
 				.delete()
 				.eq('post_id', postId);
 			if (deleteTagsError) {
-				console.error("Error deleting tags when empty array provided:", deleteTagsError);
+				console.error(
+					'Error deleting tags when empty array provided:',
+					deleteTagsError
+				);
 			}
 		}
 
-		return NextResponse.json({ id: postId, message: 'Post updated successfully' }, { status: 200 });
+		return NextResponse.json(
+			{ id: postId, message: 'Post updated successfully' },
+			{ status: 200 }
+		);
 	} catch (err: any) {
-		console.error("Unexpected error in PUT /api/posts/[id]:", err);
+		console.error('Unexpected error in PUT /api/posts/[id]:', err);
 		return NextResponse.json(
 			{ error: 'Internal Server Error' },
 			{ status: 500 }
@@ -194,9 +211,9 @@ export async function PUT(
 
 export async function DELETE(
 	request: NextRequest,
-	{ params }: { params: { id: string } }
+	{ params }: { params: Promise<{ id: string }> }
 ) {
-	const paramId = await params.id;
+	const paramId = (await params).id;
 	const token = (await cookies()).get('token')?.value;
 	if (!token) {
 		return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -217,7 +234,8 @@ export async function DELETE(
 
 	if (fetchError) {
 		// Handle case where post doesn't exist or other DB error
-		if (fetchError.code === 'PGRST116') { // Post not found
+		if (fetchError.code === 'PGRST116') {
+			// Post not found
 			return NextResponse.json({ error: 'Post not found' }, { status: 404 });
 		}
 		return NextResponse.json({ error: fetchError.message }, { status: 500 });
@@ -233,7 +251,10 @@ export async function DELETE(
 	}
 
 	// 3. Proceed with deletion
-	const { error: deleteError } = await supabase.from('posts').delete().eq('id', paramId);
+	const { error: deleteError } = await supabase
+		.from('posts')
+		.delete()
+		.eq('id', paramId);
 
 	if (deleteError) {
 		return NextResponse.json({ error: deleteError.message }, { status: 500 });

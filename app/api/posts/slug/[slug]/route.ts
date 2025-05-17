@@ -5,9 +5,10 @@ import jwt from 'jsonwebtoken';
 
 export async function GET(
     request: NextRequest,
-    { params }: { params: { slug: string } }
+    { params }: { params: Promise<{ slug: string }> }
 ) {
-    if (!params.slug) {
+    const _slug = (await params).slug;
+    if (!_slug) {
         return NextResponse.json({ error: 'Slug parameter is required' }, { status: 400 });
     }
 
@@ -24,7 +25,7 @@ export async function GET(
                 )
             )
         `)
-        .eq('slug', params.slug)
+        .eq('slug', _slug)
         .maybeSingle(); // Use maybeSingle to handle null if not found gracefully
 
     if (error) {

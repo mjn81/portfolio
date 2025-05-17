@@ -35,7 +35,7 @@ const ChartContainer = ({
   children,
   className,
 }: {
-  children: React.ReactNode
+  children: React.ReactElement
   className?: string
 }) => {
   return (
@@ -246,7 +246,7 @@ const ChartTooltip = ({
         <div className="grid grid-cols-2 gap-2">
           <div className="flex flex-col">
             <span className="text-[0.70rem] uppercase text-muted-foreground">{label}</span>
-            <span className="font-bold text-foreground">{labelFormatter ? labelFormatter(label) : label}</span>
+            <span className="font-bold text-foreground">{labelFormatter ? labelFormatter(label, payload) : label}</span>
           </div>
           {payload.map((item, index) => (
             <div key={index} className="flex flex-col">
@@ -259,7 +259,7 @@ const ChartTooltip = ({
                 {item.name}
               </span>
               <span className="font-bold" style={{ color: item.color }}>
-                {formatter ? formatter(item.value as number, item.name, item, index) : item.value}
+                {formatter ? formatter(item.value as number, item.name as NameType, item, index, item.payload) : item.value}
               </span>
             </div>
           ))}

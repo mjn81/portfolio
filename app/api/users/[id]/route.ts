@@ -13,9 +13,9 @@ const ALLOWED_STATUSES = ['Active', 'Inactive'];
 
 export async function GET(
 	request: NextRequest,
-	{ params }: { params: { id: string } }
+	{ params }: { params: Promise<{ id: string }> }
 ) {
-	const paramId = await params.id;
+	const paramId = (await params).id;
 	// user authentication only
 	const token = (await cookies()).get('token')?.value;
 
@@ -39,8 +39,11 @@ export async function GET(
 		if (error.code === 'PGRST116') {
 			return NextResponse.json({ error: 'User not found' }, { status: 404 });
 		}
-		console.error("Error fetching user:", error);
-		return NextResponse.json({ error: 'Failed to fetch user' }, { status: 500 });
+		console.error('Error fetching user:', error);
+		return NextResponse.json(
+			{ error: 'Failed to fetch user' },
+			{ status: 500 }
+		);
 	}
 
 	delete (data as any).password;
@@ -50,7 +53,7 @@ export async function GET(
 
 export async function PUT(
 	request: NextRequest,
-	{ params }: { params: { id: string } }
+	{ params }: { params: Promise<{ id: string }> }
 ) {
 	const token = (await cookies()).get('token')?.value;
 
@@ -65,7 +68,7 @@ export async function PUT(
 		return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
 	}
 
-	const { id } = params;
+	const { id } = await params;
 	const updates = await request.json();
 
 	// If the user is not admin and trying to update another user's info
@@ -133,7 +136,7 @@ export async function PUT(
 
 export async function DELETE(
 	request: NextRequest,
-	{ params }: { params: { id: string } }
+	{ params }: { params: Promise<{ id: string }> }
 ) {
 	const token = (await cookies()).get('token')?.value;
 	if (!token) {
@@ -150,7 +153,7 @@ export async function DELETE(
 		return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
 	}
 
-	const { id } = params;
+	const { id } = await params;
 
 	const { error } = await supabase
 		.from('users')

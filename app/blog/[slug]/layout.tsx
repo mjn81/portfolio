@@ -11,7 +11,7 @@ interface BlogPostData extends Omit<Post, 'author'> {
 }
 
 interface GenerateMetadataProps {
-    params: { slug: string };
+    params: Promise<{ slug: string }>;
 }
 
 // --- Metadata Fetching Logic (Copied from page.tsx) ---
@@ -36,7 +36,7 @@ export async function generateMetadata(
     { params }: GenerateMetadataProps,
     parent: ResolvingMetadata
 ): Promise<Metadata> {
-    const slug = params.slug;
+    const slug = (await params).slug;
     const post = await getPostMetadata(slug);
 
     if (!post) {

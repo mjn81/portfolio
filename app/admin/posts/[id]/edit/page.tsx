@@ -40,18 +40,18 @@ import Image from 'next/image';
 import type { Post } from '@/types/post';
 import type { Tag } from '@/types/tag';
 import { withAuth } from '@/hooks/use-auth';
+import { PageProps } from '@/.next/types/app/page';
 
 interface TagOption {
 	value: string;
 	label: string;
 }
 
-interface EditPostPageProps {
-	params: { id: string };
+interface EditPostPageProps extends PageProps {
+	params: Promise<{ id: string }>;
 }
 
 function EditPostPage({ params }: EditPostPageProps) {
-	// @ts-ignore
 	const postId = React.use(params).id;
 	const [isLoading, setIsLoading] = useState(true);
 	const [isSubmitting, setIsSubmitting] = useState(false);
