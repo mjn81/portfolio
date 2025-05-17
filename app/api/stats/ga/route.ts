@@ -48,23 +48,30 @@ async function fetchGASummary(client: BetaAnalyticsDataClient, dateRange: { star
                 { name: 'screenPageViews' }, // Total Views
                 { name: 'activeUsers' },      // Unique Visitors approximation
                 // { name: 'bounceRate' }, // Often requires session dimensions, can be complex
-                // { name: 'averageSessionDuration' }, // Can also be added
+                { name: 'averageSessionDuration' }, // Can also be added
             ],
         });
 
         let views = 0;
         let visitors = 0;
         // let bounceRate = 0;
-        // let avgTimeOnPage = '0s';
+        let avgTimeOnPage = '0s';
 
         if (response.rows && response.rows.length > 0) {
             // For a simple summary without dimensions, results are usually in the first row
             views = parseInt(response.rows[0].metricValues?.[0]?.value || '0');
             visitors = parseInt(response.rows[0].metricValues?.[1]?.value || '0');
             // Extract other metrics similarly if added
+            const avgSessionDurationSec = parseFloat(response.rows[0].metricValues?.[2]?.value || '0');
+            if (!isNaN(avgSessionDurationSec) && avgSessionDurationSec > 0) {
+                // Convert seconds to "Xm Ys" format
+                const minutes = Math.floor(avgSessionDurationSec / 60);
+                const seconds = Math.round(avgSessionDurationSec % 60);
+                avgTimeOnPage = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+            }
         }
 
-        return { views, visitors, bounceRate: 0, avgTimeOnPage: '0s' }; // Returning 0 for unimplemented metrics
+        return { views, visitors, bounceRate: 0, avgTimeOnPage }; // Returning 0 for unimplemented metrics
      } catch (error: any) {
          console.error('Error fetching GA Summary Data:', error);
          throw new Error(`GA API Error (Summary): ${error.message || 'Unknown error'}`);
