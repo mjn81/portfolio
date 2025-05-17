@@ -7,68 +7,85 @@ import { Code2, Database, Cloud, Cpu, LineChart, Layers, Globe, Smartphone } fro
 const caveat = Caveat({ subsets: ["latin"] })
 
 const skillCategories = [
+	{
+		title: 'Programming Languages',
+		icon: <Code2 className="h-6 w-6" />,
+		skills: ['JavaScript', 'TypeScript', 'Python', 'Go'],
+	},
+	{
+		title: 'Web Development',
+		icon: <Globe className="h-6 w-6" />,
+		skills: ['React', 'Next.js', 'Node.js', 'Express', 'Nest','GraphQL', 'REST API'],
+	},
+	{
+		title: 'Artificial Intelligence',
+		icon: <Cpu className="h-6 w-6" />,
+		skills: [
+			'Machine Learning',
+			'Deep Learning',
+			'NLP',
+			'Computer Vision',
+      'LLM',
+      'Multi-modal AI',
+      'Agent-based AI',
+      'Automated Speech Recognition',
+		],
+	},
+	{
+		title: 'Data Science',
+		icon: <LineChart className="h-6 w-6" />,
+		skills: [
+			'Data Analysis',
+			'Data Visualization',
+			'Statistical Modeling',
+		],
+	},
   {
-    title: "Programming Languages",
-    icon: <Code2 className="h-6 w-6" />,
-    skills: ["JavaScript", "TypeScript", "Python", "Java", "C++", "Go"],
-  },
-  {
-    title: "Web Development",
-    icon: <Globe className="h-6 w-6" />,
-    skills: ["React", "Next.js", "Node.js", "Express", "GraphQL", "REST API"],
-  },
-  {
-    title: "Mobile Development",
-    icon: <Smartphone className="h-6 w-6" />,
-    skills: ["React Native", "Flutter", "iOS", "Android", "PWA"],
-  },
-  {
-    title: "Artificial Intelligence",
-    icon: <Cpu className="h-6 w-6" />,
-    skills: ["Machine Learning", "Deep Learning", "NLP", "Computer Vision", "LLMs"],
-  },
-  {
-    title: "Data Science",
-    icon: <LineChart className="h-6 w-6" />,
-    skills: ["Data Analysis", "Data Visualization", "Statistical Modeling", "Big Data"],
-  },
-  {
-    title: "Databases",
+    title: 'Databases',
     icon: <Database className="h-6 w-6" />,
-    skills: ["SQL", "MongoDB", "PostgreSQL", "Redis", "Firebase"],
-  },
-  {
-    title: "DevOps & Cloud",
-    icon: <Cloud className="h-6 w-6" />,
-    skills: ["Docker", "Kubernetes", "AWS", "GCP", "CI/CD", "Terraform"],
-  },
-  {
-    title: "Architecture",
-    icon: <Layers className="h-6 w-6" />,
-    skills: ["Microservices", "Serverless", "System Design", "API Design", "DDD"],
-  },
-]
+    skills: ['SQL', 'MongoDB', 'PostgreSQL','MySQL', 'Redis', 'Neo4j'],
+	},
+	{
+		title: 'DevOps & Cloud',
+		icon: <Cloud className="h-6 w-6" />,
+		skills: ['Docker', 'Kubernetes', 'AWS', 'CI/CD', 'OpenTelemetry'],
+	},
+	{
+		title: 'Architecture',
+		icon: <Layers className="h-6 w-6" />,
+		skills: [
+			'Microservices',
+      'Serverless',
+      'Event-Driven Architecture',
+      'Edge Computing',
+			'System Design',
+			'API Design',
+      'DDD',
+		],
+	},
+];
+
+const containerVariants = {
+	hidden: { opacity: 0 },
+	visible: {
+		opacity: 1,
+		transition: {
+			staggerChildren: 0.1,
+		},
+	},
+};
+
+const itemVariants = {
+	hidden: { opacity: 0, y: 20 },
+	visible: {
+		opacity: 1,
+		y: 0,
+		transition: { duration: 0.5 },
+	},
+};
 
 const Skills = () => {
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1,
-      },
-    },
-  }
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.5 },
-    },
-  }
-
+  
   return (
     <section className="py-20 bg-background/50 relative overflow-hidden">
       {/* Background elements */}

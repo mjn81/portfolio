@@ -13,85 +13,30 @@ import {
 import { Button } from '@/components/ui/button';
 import { ExternalLink, Github } from 'lucide-react';
 import Image from 'next/image';
+import { projects } from '@/data/projects';
 
 const caveat = Caveat({ subsets: ['latin'] });
 
-const projects = [
-	{
-		title: 'AI-Powered Analytics Platform',
-		description:
-			'A comprehensive analytics platform that leverages machine learning to provide predictive insights for businesses.',
-		image: '/placeholder.svg?height=600&width=800',
-		tags: ['React', 'Python', 'TensorFlow', 'AWS'],
-		demoLink: '#',
-		githubLink: '#',
+const containerVariants = {
+	hidden: { opacity: 0 },
+	visible: {
+		opacity: 1,
+		transition: {
+			staggerChildren: 0.1,
+		},
 	},
-	{
-		title: 'Smart Home Automation System',
-		description:
-			'An IoT-based system that uses AI to learn user preferences and automate home environments for optimal comfort and energy efficiency.',
-		image: '/placeholder.svg?height=600&width=800',
-		tags: ['IoT', 'Node.js', 'Machine Learning', 'React Native'],
-		demoLink: '#',
-		githubLink: '#',
+};
+
+const itemVariants = {
+	hidden: { opacity: 0, y: 20 },
+	visible: {
+		opacity: 1,
+		y: 0,
+		transition: { duration: 0.5 },
 	},
-	{
-		title: 'Natural Language Processing API',
-		description:
-			'A robust API that provides advanced NLP capabilities including sentiment analysis, entity recognition, and language translation.',
-		image: '/placeholder.svg?height=600&width=800',
-		tags: ['Python', 'NLP', 'Docker', 'FastAPI'],
-		demoLink: '#',
-		githubLink: '#',
-	},
-	{
-		title: 'E-commerce Recommendation Engine',
-		description:
-			'A sophisticated recommendation system that analyzes user behavior to suggest products with high relevance and conversion potential.',
-		image: '/placeholder.svg?height=600&width=800',
-		tags: ['Python', 'React', 'GraphQL', 'MongoDB'],
-		demoLink: '#',
-		githubLink: '#',
-	},
-	{
-		title: 'Real-time Collaboration Platform',
-		description:
-			'A secure platform enabling teams to collaborate on documents, code, and designs in real-time with intelligent suggestions.',
-		image: '/placeholder.svg?height=600&width=800',
-		tags: ['WebSockets', 'React', 'Node.js', 'PostgreSQL'],
-		demoLink: '#',
-		githubLink: '#',
-	},
-	{
-		title: 'Computer Vision for Quality Control',
-		description:
-			'An industrial solution that uses computer vision to detect defects in manufacturing processes with high accuracy.',
-		image: '/placeholder.svg?height=600&width=800',
-		tags: ['Computer Vision', 'Python', 'TensorFlow', 'Docker'],
-		demoLink: '#',
-		githubLink: '#',
-	},
-];
+};
 
 const Projects = () => {
-	const containerVariants = {
-		hidden: { opacity: 0 },
-		visible: {
-			opacity: 1,
-			transition: {
-				staggerChildren: 0.1,
-			},
-		},
-	};
-
-	const itemVariants = {
-		hidden: { opacity: 0, y: 20 },
-		visible: {
-			opacity: 1,
-			y: 0,
-			transition: { duration: 0.5 },
-		},
-	};
 
 	return (
 		<section

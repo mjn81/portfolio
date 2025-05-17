@@ -7,71 +7,21 @@ import { Calendar, Briefcase, Award, Code, Cpu, Layers, Sparkles } from "lucide-
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { CloudDownload } from "lucide-react"
+import { experiences, type ExperienceProps } from "@/data/journey"
 
 const caveat = Caveat({ subsets: ["latin"] })
 
-interface ExperienceProps {
-  year: string
-  role: string
-  company: string
-  description: string
-  skills: string[]
-  index: number
-}
+const icons = [
+	<Cpu className="h-5 w-5" />,
+	<Code className="h-5 w-5" />,
+	<Layers className="h-5 w-5" />,
+	<Sparkles className="h-5 w-5" />,
+	<Award className="h-5 w-5" />,
+];
 
-const experiences = [
-  {
-    year: "2022-Present",
-    role: "Senior Software Engineer",
-    company: "Tech Innovations Inc.",
-    description:
-      "Leading AI-powered solutions development and mentoring junior developers. Architecting scalable systems and implementing best practices across the organization.",
-    skills: ["React", "Node.js", "TensorFlow", "AWS", "System Architecture"],
-  },
-  {
-    year: "2020-2022",
-    role: "AI Engineer",
-    company: "DataMind Solutions",
-    description:
-      "Developed machine learning models for predictive analytics and natural language processing. Implemented computer vision solutions for industrial applications.",
-    skills: ["Python", "PyTorch", "NLP", "Computer Vision", "Docker"],
-  },
-  {
-    year: "2018-2020",
-    role: "Full Stack Developer",
-    company: "WebFront Technologies",
-    description:
-      "Built responsive web applications and contributed to open-source projects. Developed RESTful APIs and implemented CI/CD pipelines.",
-    skills: ["JavaScript", "React", "GraphQL", "MongoDB", "CI/CD"],
-  },
-  {
-    year: "2016-2018",
-    role: "Mobile Developer",
-    company: "AppSphere",
-    description:
-      "Created cross-platform mobile applications with focus on performance and user experience. Integrated various third-party services and APIs.",
-    skills: ["React Native", "Flutter", "iOS", "Android", "Firebase"],
-  },
-  {
-    year: "2014-2016",
-    role: "Junior Developer",
-    company: "CodeCraft Studios",
-    description:
-      "Started professional journey developing web applications and learning software engineering principles. Participated in agile development processes.",
-    skills: ["HTML/CSS", "JavaScript", "PHP", "MySQL", "Git"],
-  },
-]
 
 const ExperienceItem = ({ year, role, company, description, skills, index }: ExperienceProps) => {
   const itemRef = useRef<HTMLDivElement>(null)
-
-  const icons = [
-    <Cpu className="h-5 w-5" />,
-    <Code className="h-5 w-5" />,
-    <Layers className="h-5 w-5" />,
-    <Sparkles className="h-5 w-5" />,
-    <Award className="h-5 w-5" />,
-	]
 
   return (
     <motion.div

@@ -15,6 +15,38 @@ import clsx from "clsx"
 
 const caveat = Caveat({ subsets: ["latin"] })
 
+const contactInfo = [
+	{
+		icon: <Mail className="h-5 w-5" />,
+		title: 'Email',
+		value: 'mjndev1831@gmail.com',
+		link: 'mailto:mjndev1831@gmail.com',
+	},
+	{
+		icon: <Phone className="h-5 w-5" />,
+		title: 'Phone',
+		value: '+98 994 151 8698',
+		link: 'tel:+989941518698',
+	},
+	{
+		icon: <MapPin className="h-5 w-5" />,
+		title: 'Location',
+		value: 'Tehran, Iran',
+		link: '#',
+	},
+];
+
+const socialLinks = [
+	{
+		icon: <Github className="h-5 w-5" />,
+		link: 'https://github.com/mjn81',
+	},
+	{
+		icon: <Linkedin className="h-5 w-5" />,
+		link: 'https://www.linkedin.com/in/mohammad-javad-najafi-670ba0235/',
+	},
+];
+
 const Contact = () => {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -78,42 +110,6 @@ const Contact = () => {
       setIsSubmitting(false);
     }
   };
-
-  const contactInfo = [
-    {
-      icon: <Mail className="h-5 w-5" />,
-      title: "Email",
-      value: "contact@mjnajafi.com",
-      link: "mailto:contact@mjnajafi.com",
-    },
-    {
-      icon: <Phone className="h-5 w-5" />,
-      title: "Phone",
-      value: "+98 912 345 6789",
-      link: "tel:+989123456789",
-    },
-    {
-      icon: <MapPin className="h-5 w-5" />,
-      title: "Location",
-      value: "Tehran, Iran",
-      link: "#",
-    },
-  ]
-
-  const socialLinks = [
-    {
-      icon: <Github className="h-5 w-5" />,
-      link: "https://github.com/",
-    },
-    {
-      icon: <Linkedin className="h-5 w-5" />,
-      link: "https://linkedin.com/",
-    },
-    {
-      icon: <Twitter className="h-5 w-5" />,
-      link: "https://twitter.com/",
-    },
-  ]
 
   return (
     <section className="py-20 bg-background relative overflow-hidden">
