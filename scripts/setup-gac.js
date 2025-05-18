@@ -1,8 +1,8 @@
-import * as fs from 'node:fs';
-import * as path from 'node:path';
+const fs = require('node:fs');
+const path = require('node:path');
 
-const credentialsJsonString: string | undefined = process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS_JSON;
-const credentialsFilePath: string | undefined = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+const credentialsJsonString = process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS_JSON;
+const credentialsFilePath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
 
 // Early exit if essential environment variables are not set or if JSON string is empty
 if (!credentialsFilePath) {
@@ -18,12 +18,12 @@ if (!credentialsJsonString || credentialsJsonString.trim() === "") {
 // Resolve the absolute path for the credentials file
 // process.cwd() is the directory from which the Node.js process was launched.
 // If package.json scripts are run with `pnpm run ...`, cwd is usually the project root.
-const projectRoot: string = process.cwd();
-const absoluteCredentialsFilePath: string = path.resolve('/tmp', path.basename(credentialsFilePath));
+const projectRoot = process.cwd();
+const absoluteCredentialsFilePath = path.resolve('/tmp', path.basename(credentialsFilePath));
 
 try {
     // Check if the directory for the credentials file exists, create it if not.
-    const dirName: string = path.dirname(absoluteCredentialsFilePath);
+    const dirName = path.dirname(absoluteCredentialsFilePath);
     if (!fs.existsSync(dirName)) {
         fs.mkdirSync(dirName, { recursive: true });
         console.log(`[Startup Script] Created directory: ${dirName}`);
@@ -35,7 +35,7 @@ try {
     } else {
         console.log(`[Startup Script] Service account file already exists at: ${absoluteCredentialsFilePath}. No action taken.`);
     }
-} catch (error: any) {
+} catch (error) {
     console.error(`[Startup Script] Error processing service account file ${absoluteCredentialsFilePath}:`, error);
     process.exit(1); // Exit with an error code
 }
