@@ -4,8 +4,8 @@
 	"private": true,
 	"scripts": {
 		"dev": "next dev",
-		"build": "node scripts/setup-gac.js && next build",
-		"start": "node scripts/setup-gac.js && next start",
+		"build": "next build",
+		"start": "next start",
 		"lint": "next lint"
 	},
 	"dependencies": {
