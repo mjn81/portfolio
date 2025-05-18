@@ -7,7 +7,7 @@
     "build": "pnpm run setup-gac && next build",
     "start": "next start",
     "lint": "next lint",
-    "setup-gac": "node --loader ts-node/esm scripts/setup-gac.ts"
+    "setup-gac": "ts-node --esm scripts/setup-gac.ts"
   },
   "dependencies": {
     "@emotion/is-prop-valid": "latest",
