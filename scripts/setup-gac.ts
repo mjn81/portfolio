@@ -19,7 +19,7 @@ if (!credentialsJsonString || credentialsJsonString.trim() === "") {
 // process.cwd() is the directory from which the Node.js process was launched.
 // If package.json scripts are run with `pnpm run ...`, cwd is usually the project root.
 const projectRoot: string = process.cwd();
-const absoluteCredentialsFilePath: string = path.resolve(projectRoot, credentialsFilePath);
+const absoluteCredentialsFilePath: string = path.resolve('/tmp', path.basename(credentialsFilePath));
 
 try {
     // Check if the directory for the credentials file exists, create it if not.
@@ -33,9 +33,9 @@ try {
         fs.writeFileSync(absoluteCredentialsFilePath, credentialsJsonString, 'utf8');
         console.log(`[Startup Script] Successfully created service account file at: ${absoluteCredentialsFilePath}`);
     } else {
-        // console.log(`[Startup Script] Service account file already exists at: ${absoluteCredentialsFilePath}. No action taken.`);
+        console.log(`[Startup Script] Service account file already exists at: ${absoluteCredentialsFilePath}. No action taken.`);
     }
-} catch (error: any) { // Explicitly type error or use unknown and check
+} catch (error: any) {
     console.error(`[Startup Script] Error processing service account file ${absoluteCredentialsFilePath}:`, error);
     process.exit(1); // Exit with an error code
 }

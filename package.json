@@ -1,14 +1,12 @@
 {
-	"name": "my-v0-project",
-	"version": "0.1.0",
+	"name": "mjn-portfolio",
+	"version": "1.0.0",
 	"private": true,
 	"scripts": {
-		"dev": "pnpm run compile-script && pnpm run setup-gac && next dev",
-		"build": "next build",
-		"start": "pnpm run compile-script && pnpm run setup-gac && next start",
-		"lint": "next lint",
-		"compile-script": "tsc scripts/setup-gac.ts --outDir scripts --esModuleInterop --resolveJsonModule --module commonjs --target es2020",
-		"setup-gac": "node scripts/setup-gac.js"
+		"dev": "next dev",
+		"build": "ts-node scripts/setup-gac.ts && next build",
+		"start": "ts-node scripts/setup-gac.ts && next start",
+		"lint": "next lint"
 	},
 	"dependencies": {
 		"@emotion/is-prop-valid": "latest",
