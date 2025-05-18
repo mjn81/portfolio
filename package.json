@@ -3,11 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "pnpm run setup-gac && next dev",
-    "build": "pnpm run setup-gac && next build",
+    "dev": "pnpm run compile-script && pnpm run setup-gac && next dev",
+    "build": "pnpm run compile-script && pnpm run setup-gac && next build",
     "start": "next start",
     "lint": "next lint",
-    "setup-gac": "ts-node --esm scripts/setup-gac.ts"
+    "compile-script": "tsc scripts/setup-gac.ts --outDir scripts --esModuleInterop --resolveJsonModule --module commonjs --target es2020",
+    "setup-gac": "node scripts/setup-gac.js"
   },
   "dependencies": {
     "@emotion/is-prop-valid": "latest",
