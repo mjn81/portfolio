@@ -53,7 +53,7 @@ export default function Home() {
       clearTimeout(timer)
       // Always ensure body overflow is reset when component unmounts or effect cleans up
       if (typeof document !== 'undefined' && document.body) {
-        document.body.style.overflow = "auto"
+      document.body.style.overflow = "auto"
       }
     }
   }, [setIsPageLoading]);

@@ -4,4 +4,4 @@ export interface Tag {
 	slug: string;
 	created_at?: string; // Optional timestamp
 	updated_at?: string; // Optional timestamp
-} 
+}

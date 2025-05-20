@@ -43,29 +43,49 @@ export function AdminSidebar() {
   const { theme, setTheme } = useTheme()
   const [isMounted, setIsMounted] = useState(false)
   const [postCount, setPostCount] = useState<number | null>(null)
-  const [isLoadingCount, setIsLoadingCount] = useState(true)
+  const [projectCount, setProjectCount] = useState<number | null>(null)
+  const [isLoadingPostCount, setIsLoadingPostCount] = useState(true)
+  const [isLoadingProjectCount, setIsLoadingProjectCount] = useState(true)
 
   useEffect(() => {
     setIsMounted(true)
 
-    const fetchCount = async () => {
-      setIsLoadingCount(true)
+    const fetchCounts = async () => {
+      setIsLoadingPostCount(true)
+      setIsLoadingProjectCount(true)
       try {
-        const response = await fetch('/api/posts/count')
-        if (!response.ok) {
-          throw new Error('Failed to fetch count')
+        const [postResponse, projectResponse] = await Promise.all([
+          fetch('/api/posts/count'),
+          fetch('/api/projects?count=true')
+        ]);
+
+        if (!postResponse.ok) {
+          console.error('Failed to fetch post count')
+          setPostCount(null)
+        } else {
+          const postData = await postResponse.json()
+          setPostCount(postData.count ?? 0)
         }
-        const data = await response.json()
-        setPostCount(data.count ?? 0)
+
+        if (!projectResponse.ok) {
+          console.error('Failed to fetch project count')
+          setProjectCount(null)
+        } else {
+          const projectData = await projectResponse.json()
+          setProjectCount(projectData.count ?? 0)
+        }
+        
       } catch (error) {
-        console.error("Error fetching post count:", error)
+        console.error("Error fetching counts:", error)
         setPostCount(null)
+        setProjectCount(null)
       } finally {
-        setIsLoadingCount(false)
+        setIsLoadingPostCount(false)
+        setIsLoadingProjectCount(false)
       }
     }
 
-    fetchCount()
+    fetchCounts()
   }, [])
 
   const isActive = (path: string) => {
@@ -128,10 +148,27 @@ export function AdminSidebar() {
                   <FileText className="h-4 w-4 shrink-0" />
                   <span className="truncate">Posts</span>
                   <Badge className="ml-auto text-xs py-0 px-1.5 h-5 bg-muted text-muted-foreground min-w-[20px] flex items-center justify-center" variant="secondary">
-                    {isLoadingCount ? (
+                    {isLoadingPostCount ? (
                       <Loader2 className="h-3 w-3 animate-spin" />
                     ) : postCount !== null ? (
                       postCount
+                    ) : (
+                      '?'
+                    )}
+                  </Badge>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={isActive("/admin/projects")} tooltip="Projects">
+                <Link href="/admin/projects" className="flex items-center gap-2">
+                  <Layers className="h-4 w-4 shrink-0" />
+                  <span className="truncate">Projects</span>
+                  <Badge className="ml-auto text-xs py-0 px-1.5 h-5 bg-muted text-muted-foreground min-w-[20px] flex items-center justify-center" variant="secondary">
+                    {isLoadingProjectCount ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : projectCount !== null ? (
+                      projectCount
                     ) : (
                       '?'
                     )}
@@ -186,7 +223,9 @@ export function AdminSidebar() {
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2 overflow-hidden">
             <Avatar className="h-8 w-8 shrink-0">
-              <AvatarImage src="/placeholder.svg?height=32&width=32" alt="Admin" />
+              <AvatarImage 
+                src={profile?.avatar || "/placeholder.svg?height=32&width=32"} 
+                alt={profile?.name ? `${profile.name}'s avatar` : "User avatar"} />
               <AvatarFallback>{
                 profile?.name
                   ? profile.name.charAt(0).toUpperCase()
