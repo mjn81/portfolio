@@ -102,6 +102,7 @@ export default function BlogPostPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const articleRef = useRef<HTMLElement>(null)
+  const [activeHeadingId, setActiveHeadingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!slug) {
@@ -133,6 +134,79 @@ export default function BlogPostPage() {
 
     fetchPost()
   }, [slug])
+
+  useEffect(() => {
+    // Initial scroll to hash if present
+    if (!isLoading && !error && post && window.location.hash) {
+      const hash = window.location.hash.substring(1);
+      if (hash) {
+        setTimeout(() => {
+          const element = document.getElementById(hash);
+          if (element) {
+            element.scrollIntoView({ behavior: "smooth", block: "start" });
+            setActiveHeadingId(hash); // Set initial active heading
+            // element.classList.add("target-highlight");
+            // setTimeout(() => element.classList.remove("target-highlight"), 2000);
+          }
+        }, 100); // Increased timeout slightly for safety with IntersectionObserver setup
+      }
+    }
+  }, [isLoading, error, post, slug]);
+
+  useEffect(() => {
+    // Scroll-spying for headings
+    if (isLoading || error || !post || !articleRef.current) return;
+
+    const headingElements = Array.from(
+      articleRef.current.querySelectorAll("h1[id], h2[id], h3[id]")
+    ) as HTMLElement[];
+
+    if (headingElements.length === 0) return;
+
+    let currentHighlightedElement: HTMLElement | null = null;
+
+    const observerCallback = (entries: IntersectionObserverEntry[]) => {
+      entries.forEach(entry => {
+        const id = entry.target.id;
+        if (entry.isIntersecting) {
+          // Update URL if this heading is the topmost visible one
+          // This simple check takes the first one that becomes visible as active.
+          // More complex logic could be used to find the "most" visible.
+          if (id !== activeHeadingId) {
+             // Update activeHeadingId state, which will trigger re-render for highlighting
+            setActiveHeadingId(id);
+            // Update URL hash without reloading or pushing to history stack
+            history.replaceState(null, "", `#${id}`);
+          }
+        }
+      });
+      // After processing all entries, update highlight based on activeHeadingId
+      headingElements.forEach(heading => {
+        if (heading.id === activeHeadingId) {
+          if (heading !== currentHighlightedElement) {
+            currentHighlightedElement?.classList.remove("target-highlight");
+            heading.classList.add("target-highlight");
+            currentHighlightedElement = heading;
+          }
+        } else {
+          heading.classList.remove("target-highlight");
+        }
+      });
+    };
+
+    const observer = new IntersectionObserver(observerCallback, {
+      rootMargin: "-20% 0px -70% 0px", // Trigger when heading is in the middle 50% of the viewport
+      threshold: 0.5, // Trigger when 50% of the element is visible
+    });
+
+    headingElements.forEach(element => observer.observe(element));
+
+    return () => {
+      observer.disconnect();
+      headingElements.forEach(heading => heading.classList.remove("target-highlight"));
+      currentHighlightedElement = null;
+    };
+  }, [isLoading, error, post, activeHeadingId]); // Add activeHeadingId to dependencies
 
   const handleShare = async () => {
     console.log("handleShare called");

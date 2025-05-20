@@ -19,6 +19,8 @@ import {
   Redo,
   Maximize,
   Minimize,
+  Heading1,
+  Heading3,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -39,48 +41,84 @@ interface RichTextEditorProps {
 
 // Helper function (can be outside components)
 const convertMarkdownToHtml = (markdown: string) => {
+  const slugify = (text: string) =>
+    text
+      .toLowerCase()
+      .replace(/\s+/g, "-") // Replace spaces with -
+      .replace(/[^\w-]+/g, "") // Remove all non-word chars but hyphens
+      .replace(/--+/g, "-") // Replace multiple - with single -
+      .replace(/^-+/, "") // Trim - from start of text
+      .replace(/-+$/, ""); // Trim - from end of text
+
   let html = markdown
-    .replace(/^### (.*$)/gm, "<h3>$1</h3>")
-    .replace(/^## (.*$)/gm, "<h2>$1</h2>")
-    .replace(/^# (.*$)/gm, "<h1>$1</h1>")
-    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*(.*?)\*/g, "<em>$1</em>")
-    .replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="$2" alt="$1" style="max-width: 100%; height: auto;" />')
-    .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
-    .replace(/^\s*-\s(.*$)/gm, "<li>$1</li>")
-    .replace(/^\s*\d+\.\s(.*$)/gm, "<li>$1</li>")
-    .replace(/`(.*?)`/g, "<code>$1</code>")
-    .replace(/\n\n/g, "</p><p>")
+    // Block-level elements first
+    .replace(/^>\s+(.*$)/gm, "<blockquote>$1</blockquote>") // Blockquotes
+    .replace(/^(?:---|\*\*\*|___)\s*$/gm, "<hr />") // Horizontal Rules
+    .replace(/^###\s+(.*$)/gm, (match, content) => {
+      const slug = slugify(content);
+      return `<h3 id=\"h3-${slug}\">${content}</h3>`;
+    })
+    .replace(/^##\s+(.*$)/gm, (match, content) => {
+      const slug = slugify(content);
+      return `<h2 id=\"h2-${slug}\">${content}</h2>`;
+    })
+    .replace(/^#\s+(.*$)/gm, (match, content) => {
+      const slug = slugify(content);
+      return `<h1 id=\"h1-${slug}\">${content}</h1>`;
+    })
+    // Fenced code blocks
+    .replace(/^```(\w*)\n([\s\S]*?)\n```$/gm, (match, lang, code) => {
+      const languageClass = lang ? `language-${lang}` : 'language-none';
+      // Basic HTML escaping for code content
+      const escapedCode = code
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+      return `<pre><code class="${languageClass}">${escapedCode}</code></pre>`;
+    })
+    // Inline elements
+    .replace(/\\*\\*(.*?)\\*\\*/g, "<strong>$1</strong>") // Bold
+    .replace(/\\*(.*?)\\*/g, "<em>$1</em>")           // Italic
+    .replace(/~~(.*?)~~/g, "<del>$1</del>")         // Strikethrough
+    .replace(/!\\[(.*?)\\]\\((.*?)\\)/g, '<img src="$2" alt="$1" style="max-width: 100%; height: auto;" />') // Image
+    .replace(/\\\[(.*?)\\\]\\((.*?)\\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')    // Link
+    .replace(/`([^`]+?)`/g, "<code>$1</code>")        // Inline Code
+    // List items (handled later with more complex logic for wrapping in <ul>/<ol>)
+    .replace(/^\\s*-\\s(.*$)/gm, "<li>$1</li>")
+    .replace(/^\\s*\\d+\\.\\s(.*$)/gm, "<li>$1</li>")
+    // Paragraphs - replace double newlines with paragraph tags
+    // Ensure this runs after block elements like code blocks and HRs to avoid interference
+    .replace(/\n\n/g, "</p><p>");
 
-  html = "<p>" + html + "</p>"
+  // Wrap orphaned li tags and the initial content in <p> tags
+  // Check if the content starts with a block element already, if not, wrap in <p>
+  if (!html.match(/^<(h[1-6]|ul|ol|li|blockquote|hr|pre|p)/)) {
+    html = "<p>" + html;
+  }
+  // Check if the content ends with a block element already, if not, wrap in </p>
+  if (!html.match(/<\/(h[1-6]|ul|ol|li|blockquote|hr|pre|p)>$/)) {
+    html = html + "</p>";
+  }
+  // Remove empty paragraphs <p></p> or <p>\s*</p>
+  html = html.replace(/<p>\s*<\/p>/g, "");
 
-  html = html.replace(/<li>(.*?)<\/li>/g, (match: string): string => {
-    if (html.indexOf("<ul>") === -1 && html.indexOf("<ol>") === -1) {
-        if (/^\s*-/.test(markdown)) {
-            return "<ul>" + match + "</ul>";
-        } else if (/^\s*\d+\./.test(markdown)) {
-            return "<ol>" + match + "</ol>";
-        }
-        return match;
+  // Consolidate list items into <ul> and <ol> tags
+  // This is a simplified approach; more robust parsing might be needed for nested lists or mixed lists.
+  html = html.replace(/<li>(.*?)<\/li>(?=\s*<li>)/g, '<li>$1</li>\n'); // Ensure newline between <li> for regex
+  html = html.replace(/(<li>(?:[^<]*(?:<(?!li|\/li)[^<]*)*)*<\/li>)+/g, (match) => {
+    if (match.includes("<ol><li>") || match.startsWith("<li>1.")) { // Basic check for ordered
+        return `<ol>${match.replace(/<ol><li>/g, "<li>")}</ol>`;
     }
-    return match;
-  })
-  // Wrap adjacent <li> into <ul> or <ol>
-  html = html.replace(/(<ul>)?(<li>.*?<\/li>)+(<\/ul>)?/g, (match, p1, p2, p3) => {
-    if (p1 && p3) return match; // Already wrapped
-    const listItems = match.match(/<li>.*?<\/li>/g)?.join('') || '';
-    if (match.includes("<ol><li>")) return `<ol>${listItems}</ol>`;
-    return `<ul>${listItems}</ul>`;
+    return `<ul>${match}</ul>`;
   });
 
-  // Clean up paragraph tags that might have been wrongly inserted around lists
-  html = html.replace(/<p><(ul|ol)>/g, "<$1>");
-  html = html.replace(/<\/(ul|ol)><\/p>/g, "</$1>");
-  // Remove empty paragraphs that might result from \n\n processing if they are truly empty
-  html = html.replace(/<p>\s*<\/p>/g, "");
-  html = html.replace(/<p><\/p>/g, "");
+  // Clean up paragraphs around lists or other block elements
+  html = html.replace(/<\/p>\s*<(ul|ol|blockquote|hr|pre)>/g, "<$1>");
+  html = html.replace(/<\/(ul|ol|blockquote|hr|pre)>\s*<p>/g, "</$1>");
 
-  return html
+  return html;
 }
 
 interface EditorDisplayProps {
@@ -107,6 +145,8 @@ interface EditorDisplayProps {
     handleAlignRight: () => void;
     handleUndo: () => void;
     handleRedo: () => void;
+    handleH1: () => void;
+    handleH3: () => void;
   };
   isInModal?: boolean;
   onToggleFullScreen?: () => void;
@@ -135,8 +175,14 @@ const EditorDisplay = memo(({
             <Button type="button" variant="ghost" size="icon" onClick={toolbarHandlers.handleItalic} title="Italic">
               <Italic className="h-4 w-4" />
             </Button>
-            <Button type="button" variant="ghost" size="icon" onClick={toolbarHandlers.handleHeading} title="Heading">
+            <Button type="button" variant="ghost" size="icon" onClick={toolbarHandlers.handleH1} title="Heading 1">
+              <Heading1 className="h-4 w-4" />
+            </Button>
+            <Button type="button" variant="ghost" size="icon" onClick={toolbarHandlers.handleHeading} title="Heading 2">
               <Heading2 className="h-4 w-4" />
+            </Button>
+            <Button type="button" variant="ghost" size="icon" onClick={toolbarHandlers.handleH3} title="Heading 3">
+              <Heading3 className="h-4 w-4" />
             </Button>
             <Button type="button" variant="ghost" size="icon" onClick={toolbarHandlers.handleLink} title="Link">
               <Link className="h-4 w-4" />
@@ -285,22 +331,73 @@ export function RichTextEditor({
     }
   }, [getSelectedText, insertText]);
 
+  const handleH1 = useCallback(() => {
+    const selectedText = getSelectedText();
+    if (selectedText) {
+      insertText("# ", "");
+    } else {
+      insertText("# Heading 1");
+    }
+  }, [getSelectedText, insertText]);
+
   const handleHeading = useCallback(() => {
     const selectedText = getSelectedText()
     if (selectedText) {
       insertText("## ", "")
     } else {
-      insertText("## Heading")
+      insertText("## Heading 2")
+    }
+  }, [getSelectedText, insertText]);
+
+  const handleH3 = useCallback(() => {
+    const selectedText = getSelectedText();
+    if (selectedText) {
+      insertText("### ", "");
+    } else {
+      insertText("### Heading 3");
     }
   }, [getSelectedText, insertText]);
 
   const handleList = useCallback(() => {
-    insertText("\\n- List item 1\\n- List item 2\\n- List item 3\\n")
-  }, [insertText]);
+    const selectedText = getSelectedText();
+    const activeRef = getActiveTextareaRef();
+    if (!activeRef.current) return;
+    const { selectionStart, value: editorValue } = activeRef.current;
+
+    if (selectedText) {
+      const lines = selectedText.split('\n');
+      const newLines = lines.map(line => line.trim() === '' ? line : `- ${line}`);
+      insertText(newLines.join('\n'), "");
+    } else {
+      const charBefore = editorValue.substring(selectionStart - 1, selectionStart);
+      if (selectionStart === 0 || charBefore === '\n') {
+        insertText("- ", "");
+      } else {
+        insertText("\n- ", "");
+      }
+    }
+  }, [getSelectedText, insertText, getActiveTextareaRef]);
 
   const handleOrderedList = useCallback(() => {
-    insertText("\\n1. List item 1\\n2. List item 2\\n3. List item 3\\n")
-  }, [insertText]);
+    const selectedText = getSelectedText();
+    const activeRef = getActiveTextareaRef();
+    if (!activeRef.current) return;
+    const { selectionStart, value: editorValue } = activeRef.current;
+
+    if (selectedText) {
+      const lines = selectedText.split('\n');
+      // Basic numbering, doesn't account for existing list numbers yet
+      const newLines = lines.map((line, index) => line.trim() === '' ? line : `${index + 1}. ${line}`);
+      insertText(newLines.join('\n'), "");
+    } else {
+      const charBefore = editorValue.substring(selectionStart - 1, selectionStart);
+      if (selectionStart === 0 || charBefore === '\n') {
+        insertText("1. ", "");
+      } else {
+        insertText("\n1. ", "");
+      }
+    }
+  }, [getSelectedText, insertText, getActiveTextareaRef]);
 
   const handleCode = useCallback(() => {
     const selectedText = getSelectedText()
@@ -351,30 +448,18 @@ export function RichTextEditor({
   }, [insertText]);
 
   const handleAlignLeft = useCallback(() => {
-    const selectedText = getSelectedText()
-    if (selectedText) {
-      insertText(`<div style="text-align: left;">\\n\\n${selectedText}\\n\\n</div>`)
-    } else {
-      insertText(`<div style="text-align: left;">\\n\\nAligned Text\\n\\n</div>`)
-    }
+    const selectedText = getSelectedText();
+    insertText(`<div style=\"text-align: left;\">`, `</div>`);
   }, [getSelectedText, insertText]);
 
   const handleAlignCenter = useCallback(() => {
-    const selectedText = getSelectedText()
-    if (selectedText) {
-      insertText(`<div style="text-align: center;">\\n\\n${selectedText}\\n\\n</div>`)
-    } else {
-      insertText(`<div style="text-align: center;">\\n\\nAligned Text\\n\\n</div>`)
-    }
+    const selectedText = getSelectedText();
+    insertText(`<div style=\"text-align: center;\">`, `</div>`);
   }, [getSelectedText, insertText]);
 
   const handleAlignRight = useCallback(() => {
-    const selectedText = getSelectedText()
-    if (selectedText) {
-      insertText(`<div style="text-align: right;">\\n\\n${selectedText}\\n\\n</div>`)
-    } else {
-      insertText(`<div style="text-align: right;">\\n\\nAligned Text\\n\\n</div>`)
-    }
+    const selectedText = getSelectedText();
+    insertText(`<div style=\"text-align: right;\">`, `</div>`);
   }, [getSelectedText, insertText]);
 
   const handleUndo = useCallback(() => {
@@ -426,7 +511,9 @@ export function RichTextEditor({
   const toolbarHandlers = {
     handleBold,
     handleItalic,
+    handleH1,
     handleHeading,
+    handleH3,
     handleLink,
     handleImage,
     handleGalleryImage,
