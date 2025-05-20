@@ -47,7 +47,7 @@ const Projects = () => {
 			setIsLoading(true);
 			setError(null);
 			try {
-				const response = await fetch('/api/projects');
+				const response = await fetch('/api/projects?sort=sort_order&order=desc');
 				if (!response.ok) {
 					throw new Error('Failed to fetch projects. Please try again later.');
 				}
