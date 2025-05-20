@@ -66,8 +66,6 @@ export default function RootLayout({
 }>) {
   return (
 		<html lang="en" suppressHydrationWarning>
-      <SpeedInsights />
-      <Analytics />
 			<PageLoadingProvider>
 				<body className={inter.className}>
 					<ThemeProvider
@@ -81,6 +79,8 @@ export default function RootLayout({
 					</ThemeProvider>
 					<Toaster />
 					<CookieConsent />
+          <SpeedInsights />
+          <Analytics />
 				</body>
 			</PageLoadingProvider>
 		</html>
