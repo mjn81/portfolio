@@ -57,11 +57,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { projectId: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ projectId: string }> }) {
   const auth = await verifyTokenAndGetUserIdAndRole();
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { projectId } = params;
+  const { projectId } = await params;
   if (!projectId) return NextResponse.json({ error: 'Project ID is required' }, { status: 400 });
 
   try {
