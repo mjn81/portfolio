@@ -5,13 +5,13 @@ import { cookies } from 'next/headers';
 import jwt from 'jsonwebtoken';
 import { generateSlug } from '@/lib/utils';
 
-async function verifyTokenAndGetUserId(): Promise<string | null> {
+async function verifyTokenAndGetUserId(): Promise<{ sub: string; role: string } | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get('token')?.value;
   if (!token) return null;
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { sub: string; role: string };
-    return decoded.sub;
+    return decoded;
   } catch (err) {
     return null;
   }
@@ -29,8 +29,8 @@ function convertDbTagsToArray(dbTags: any): string[] {
 }
 
 export async function POST(request: NextRequest) {
-  const authorId = await verifyTokenAndGetUserId();
-  if (!authorId) {
+  const authorInfo = await verifyTokenAndGetUserId();
+  if (!authorInfo || authorInfo.role.toLowerCase() !== 'admin') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
 
     const { data: newProject, error: projectError } = await supabase
       .from('projects')
-      .insert([{ ...projectDataFields, title, slug, tags: tagsString, author_id: authorId }])
+      .insert([{ ...projectDataFields, title, slug, tags: tagsString, author_id: authorInfo.sub }])
       .select()
       .single();
 

@@ -16,6 +16,7 @@ import {
   Sun,
   Moon,
   Loader2,
+  Mail,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/hooks/use-auth"
@@ -173,6 +174,14 @@ export function AdminSidebar() {
                       '?'
                     )}
                   </Badge>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={isActive("/admin/contacts")} tooltip="Contact Messages">
+                <Link href="/admin/contacts" className="flex items-center gap-2">
+                  <Mail className="h-4 w-4 shrink-0" />
+                  <span className="truncate">Contact Messages</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
