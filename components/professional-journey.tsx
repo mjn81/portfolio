@@ -1,12 +1,10 @@
 "use client"
 
 import { motion, useScroll, useTransform } from "framer-motion"
-import { useRef, useState } from "react"
+import { useRef, useState, useEffect } from "react"
 import { Caveat } from "next/font/google"
-import { Calendar, Briefcase, Award, Code, Cpu, Layers, Sparkles } from "lucide-react"
+import { Calendar, Briefcase, Award, Code, Cpu, Layers, Sparkles, CloudDownload } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import Link from "next/link"
-import { CloudDownload } from "lucide-react"
 import { experiences, type ExperienceProps } from "@/data/journey"
 
 const caveat = Caveat({ subsets: ["latin"] })
@@ -86,6 +84,31 @@ const ProfessionalJourney = () => {
   })
 
   const [isHovering, setIsHovering] = useState(false);
+  const [resumeUrl, setResumeUrl] = useState<string | null>(null);
+  const [isLoadingResume, setIsLoadingResume] = useState(true);
+
+  useEffect(() => {
+    const fetchResumeUrl = async () => {
+      setIsLoadingResume(true);
+      try {
+        const response = await fetch('/api/settings/resume');
+        if (response.ok) {
+          const data = await response.json();
+          setResumeUrl(data.resumeUrl || null);
+        } else {
+          console.error('Failed to fetch resume URL for Professional Journey');
+          setResumeUrl(null);
+        }
+      } catch (error) {
+        console.error('Error fetching resume URL:', error);
+        setResumeUrl(null);
+      } finally {
+        setIsLoadingResume(false);
+      }
+    };
+
+    fetchResumeUrl();
+  }, []);
 
   const lineHeight = useTransform(scrollYProgress, [0, 1], ["0%", "100%"])
 
@@ -140,52 +163,60 @@ const ProfessionalJourney = () => {
 					transition={{ duration: 0.5, delay: 0.4 }}
 					className="text-center mt-12"
 				>
-					<Link href="/resume.pdf" target="_blank" rel="noopener noreferrer">
-						<Button
-							onMouseEnter={() => setIsHovering(true)}
-							onMouseLeave={() => setIsHovering(false)}
-							variant="outline"
-							size="lg"
-							className="group overflow-hidden hover:bg-primary hover:text-primary-foreground"
-						>
-							Download CV
-							{/* Icon with v0-like pulse animation */}
-							<motion.div
-								className="relative"
-								animate={
-									isHovering
-										? {
-												scale: [1, 1.25, 1],
-												transition: {
-													duration: 1.5,
-													repeat: Number.POSITIVE_INFINITY,
-													repeatType: 'loop',
-												},
-										  }
-										: { scale: 1 }
-								}
-							>
-								<CloudDownload className="h-5 w-5" />
-
-								{/* Pulsing ring around icon */}
-								{isHovering && (
-									<motion.div
-										className="absolute left-1/2 top-1/2 h-full w-full -translate-x-1/2 -translate-y-1/2 rounded-full border border-foreground/20"
-										initial={{ opacity: 1, scale: 1 }}
-										animate={{
-											opacity: [1, 0],
-											scale: [1, 3],
-										}}
-										transition={{
-											duration: 1.5,
-											repeat: Number.POSITIVE_INFINITY,
-											repeatType: 'loop',
-										}}
-									/>
-								)}
-							</motion.div>
-						</Button>
-					</Link>
+          {/* Conditionally render button based on resumeUrl and loading state */} 
+          {!isLoadingResume && resumeUrl ? (
+            <a href={resumeUrl} target="_blank" rel="noopener noreferrer" download>
+              <Button
+                onMouseEnter={() => setIsHovering(true)}
+                onMouseLeave={() => setIsHovering(false)}
+                variant="outline"
+                size="lg"
+                className="group overflow-hidden hover:bg-primary hover:text-primary-foreground"
+              >
+                Download CV
+                <motion.div
+                  className="relative ml-2" 
+                  animate={
+                    isHovering
+                      ? {
+                          scale: [1, 1.25, 1],
+                          transition: {
+                            duration: 1.5,
+                            repeat: Number.POSITIVE_INFINITY,
+                            repeatType: 'loop',
+                          },
+                        }
+                      : { scale: 1 }
+                  }
+                >
+                  <CloudDownload className="h-5 w-5" />
+                  {isHovering && (
+                    <motion.div
+                      className="absolute left-1/2 top-1/2 h-full w-full -translate-x-1/2 -translate-y-1/2 rounded-full border border-foreground/20"
+                      initial={{ opacity: 1, scale: 1 }}
+                      animate={{
+                        opacity: [1, 0],
+                        scale: [1, 3],
+                      }}
+                      transition={{
+                        duration: 1.5,
+                        repeat: Number.POSITIVE_INFINITY,
+                        repeatType: 'loop',
+                      }}
+                    />
+                  )}
+                </motion.div>
+              </Button>
+            </a>
+          ) : isLoadingResume ? (
+            <Button variant="outline" size="lg" disabled>
+              Loading CV...
+            </Button>
+          ) : (
+            <Button variant="outline" size="lg" disabled>
+              CV Not Available
+            </Button>
+          )}
 				</motion.div>
 			</div>
 
@@ -197,4 +228,4 @@ const ProfessionalJourney = () => {
 	);
 }
 
-export default ProfessionalJourney
+export default ProfessionalJourney;

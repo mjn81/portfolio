@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/components/ui/use-toast"
 import { withAuth } from '@/hooks/use-auth';
+import { ResumeUploader } from '@/components/admin/resume-uploader';
 
 function SettingsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -217,6 +218,10 @@ function SettingsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <div className="space-y-8">
+        <ResumeUploader />
+      </div>
     </div>
   )
 }
