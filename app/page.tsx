@@ -1,8 +1,7 @@
 "use client"
 
 import type React from "react"
-
-import { useState, useEffect } from "react"
+import { useEffect } from "react"
 import Navbar from "@/components/navbar"
 import Hero from "@/components/hero"
 import ProfessionalJourney from "@/components/professional-journey"
@@ -13,6 +12,7 @@ import Contact from "@/components/contact"
 import Footer from "@/components/footer"
 import LoadingScreen from "@/components/loading-screen"
 import ScrollReveal from "@/components/scroll-reveal"
+import { usePageLoading } from "@/app/contexts/page-loading-context"
 
 // Section wrapper component to handle alternating backgrounds
 const SectionWrapper = ({
@@ -35,31 +35,32 @@ const SectionWrapper = ({
 )
 
 export default function Home() {
-  // Fix the loading state to prevent scroll blocking after animation completes
-  const [loading, setLoading] = useState(true)
+  const { isPageLoading, setIsPageLoading } = usePageLoading();
 
-  // Update the useEffect that handles loading state to ensure overflow is properly reset
+  // Update the useEffect that handles loading state
   useEffect(() => {
     // Set initial body overflow to hidden
     document.body.style.overflow = "hidden"
 
     // Simulate loading time - increased to allow the typing animation to complete
     const timer = setTimeout(() => {
-      setLoading(false)
+      setIsPageLoading(false);
       // Ensure body overflow is reset to auto when loading is complete
       document.body.style.overflow = "auto"
     }, 6000) // 6 seconds to ensure the typing animation completes
 
     return () => {
       clearTimeout(timer)
-      // Always ensure body overflow is reset when component unmounts
-      document.body.style.overflow = "auto"
+      // Always ensure body overflow is reset when component unmounts or effect cleans up
+      if (typeof document !== 'undefined' && document.body) {
+        document.body.style.overflow = "auto"
+      }
     }
-  }, [])
+  }, [setIsPageLoading]);
 
   // Initialize scroll reveal animations after page load
   useEffect(() => {
-    if (!loading) {
+    if (!isPageLoading) {
       const revealElements = document.querySelectorAll(
         ".reveal-from-bottom, .reveal-from-left, .reveal-from-right, .reveal-scale",
       )
@@ -89,11 +90,11 @@ export default function Home() {
         })
       }
     }
-  }, [loading])
+  }, [isPageLoading])
 
   return (
     <main className="min-h-screen overflow-hidden">
-      {loading && <LoadingScreen />}
+      {isPageLoading && <LoadingScreen />}
       <Navbar notMain={false} />
 
       {/* Hero section - no effect background */}

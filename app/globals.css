@@ -304,3 +304,19 @@
 .prose blockquote p {
   margin: 0.5rem 0;
 }
+
+@layer utilities {
+  @keyframes slideInUp {
+    from {
+      transform: translateY(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+  .animate-slideInUp {
+    animation: slideInUp 0.5s ease-out forwards;
+  }
+}
