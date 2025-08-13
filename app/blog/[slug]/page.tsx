@@ -405,11 +405,11 @@ export default function BlogPostPage() {
 									))}
 								</div>
 
-								<h1 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-6 text-white drop-shadow-sm leading-tight tracking-tight">
+								<h1 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-6 text-foreground drop-shadow-sm leading-tight tracking-tight">
 									{post.title}
 								</h1>
 
-								<div className="flex flex-wrap items-center gap-6 text-sm text-white/90">
+								<div className="flex flex-wrap items-center gap-6 text-sm text-foreground/90">
 									<div className="flex items-center">
 										<Calendar className="h-4 w-4 mr-2" />
                     {formatDate(post.published_at)}

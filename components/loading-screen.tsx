@@ -112,7 +112,7 @@ const LoadingScreen = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="w-full bg-black/90 backdrop-blur-lg rounded-lg overflow-hidden border border-primary/20 shadow-xl"
+          className="w-full bg-background/90 dark:bg-black/90 backdrop-blur-lg rounded-lg overflow-hidden border border-primary/20 shadow-xl"
         >
           {/* Terminal header */}
           <div className="bg-background/10 px-4 py-2 flex items-center justify-between border-b border-primary/10">
