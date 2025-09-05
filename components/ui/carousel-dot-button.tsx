@@ -1,13 +1,14 @@
 'use client';
 
 import React, { ComponentPropsWithRef, useCallback, useEffect, useState } from 'react';
-import { EmblaCarouselType } from 'embla-carousel-react';
 
 type UseDotButtonType = {
   selectedIndex: number;
   scrollSnaps: number[];
   onDotButtonClick: (index: number) => void;
 };
+
+type EmblaCarouselType = any;
 
 export const useDotButton = (
   emblaApi: EmblaCarouselType | undefined

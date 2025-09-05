@@ -1,7 +1,6 @@
 'use client';
 
 import React, { ComponentPropsWithRef, useCallback, useEffect, useState } from 'react';
-import { EmblaCarouselType } from 'embla-carousel-react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from './button';
 import { cn } from '@/lib/utils';
@@ -13,6 +12,7 @@ type UsePrevNextButtonsType = {
   onNextButtonClick: () => void;
 };
 
+type EmblaCarouselType = any;
 export const usePrevNextButtons = (
   emblaApi: EmblaCarouselType | undefined
 ): UsePrevNextButtonsType => {
