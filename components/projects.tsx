@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { ExternalLink, Github, Loader2, AlertTriangle } from 'lucide-react';
 import Image from 'next/image';
 import { Project } from '@/types/project';
+import Carousel from '@/components/ui/carousel';
 
 const caveat = Caveat({ subsets: ['latin'] });
 
@@ -36,6 +37,69 @@ const itemVariants = {
 		transition: { duration: 0.5 },
 	},
 };
+
+// Project Card Component
+const ProjectCard = ({ project }: { project: Project }) => (
+	<Card className="overflow-hidden border border-border bg-card/50 backdrop-blur-sm hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 hover:-translate-y-1 flex flex-col h-full">
+		<div className="relative h-56 sm:h-64 overflow-hidden">
+			<Image
+				src={project.image_url || '/placeholder-project.svg'}
+				alt={project.image_alt_text || project.title}
+				fill
+				className="object-cover transition-transform duration-500 hover:scale-105"
+				sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+			/>
+		</div>
+		<CardHeader className="flex-none">
+			<CardTitle>{project.title}</CardTitle>
+			<CardDescription className="line-clamp-3 h-[4.5em]">
+				{project.description}
+			</CardDescription>
+		</CardHeader>
+		<CardContent className="flex-grow">
+			{project.tags && Array.isArray(project.tags) && project.tags.length > 0 && (
+				<div className="flex flex-wrap gap-2 mt-2">
+					{project.tags.map((tagString, index) => (
+						<span
+							key={`${project.id}-tag-${index}-${tagString}`}
+							className="px-2 py-1 bg-accent/10 text-accent text-xs rounded-full"
+						>
+							{tagString}
+						</span>
+					))}
+				</div>
+			)}
+		</CardContent>
+		<CardFooter className="flex justify-between items-center mt-auto flex-none pt-4">
+			{project.github_link && (
+				<Button variant="outline" size="sm" asChild>
+					<a
+						href={project.github_link}
+						target="_blank"
+						rel="noopener noreferrer"
+						aria-label={`View source code for ${project.title} on GitHub`}
+					>
+						<Github className="mr-2 h-4 w-4" />
+						Code
+					</a>
+				</Button>
+			)}
+			{project.demo_link && project.demo_link !== '#' && (
+				<Button size="sm" asChild>
+					<a
+						href={project.demo_link}
+						target="_blank"
+						rel="noopener noreferrer"
+						aria-label={`View live demo for ${project.title}`}
+					>
+						<ExternalLink className="mr-2 h-4 w-4" />
+						Demo
+					</a>
+				</Button>
+			)}
+		</CardFooter>
+	</Card>
+);
 
 const Projects = () => {
 	const [projects, setProjects] = useState<Project[]>([]);
@@ -119,71 +183,35 @@ const Projects = () => {
 						initial="hidden"
 						whileInView="visible"
 						viewport={{ once: true }}
-						className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
 					>
-						{projects.map((project) => (
-							<motion.div key={project.id} variants={itemVariants}>
-								<Card className="overflow-hidden border border-border bg-card/50 backdrop-blur-sm hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 hover:-translate-y-1 flex flex-col h-full">
-									<div className="relative h-56 sm:h-64 overflow-hidden">
-										<Image
-											src={project.image_url || '/placeholder-project.svg'}
-											alt={project.image_alt_text || project.title}
-											fill
-											className="object-cover transition-transform duration-500 hover:scale-105"
-											sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-										/>
-									</div>
-									<CardHeader className="flex-none">
-										<CardTitle>{project.title}</CardTitle>
-										<CardDescription className="line-clamp-3 h-[4.5em]">
-											{project.description}
-										</CardDescription>
-									</CardHeader>
-									<CardContent className="flex-grow">
-										{project.tags && Array.isArray(project.tags) && project.tags.length > 0 && (
-											<div className="flex flex-wrap gap-2 mt-2">
-												{project.tags.map((tagString, index) => (
-													<span
-														key={`${project.id}-tag-${index}-${tagString}`}
-														className="px-2 py-1 bg-accent/10 text-accent text-xs rounded-full"
-													>
-														{tagString}
-													</span>
-												))}
-											</div>
-										)}
-									</CardContent>
-									<CardFooter className="flex justify-between items-center mt-auto flex-none pt-4">
-										{project.github_link && (
-											<Button variant="outline" size="sm" asChild>
-												<a
-													href={project.github_link}
-													target="_blank"
-													rel="noopener noreferrer"
-													aria-label={`View source code for ${project.title} on GitHub`}
-												>
-													<Github className="mr-2 h-4 w-4" />
-													Code
-												</a>
-											</Button>
-										)}
-										{project.demo_link && project.demo_link !== '#' && (
-											<Button size="sm" asChild>
-												<a
-													href={project.demo_link}
-													target="_blank"
-													rel="noopener noreferrer"
-													aria-label={`View live demo for ${project.title}`}
-												>
-													<ExternalLink className="mr-2 h-4 w-4" />
-													Demo
-												</a>
-											</Button>
-										)}
-									</CardFooter>
-								</Card>
-							</motion.div>
-						))}
+						{projects.length <= 3 ? (
+							// Show grid layout for 3 or fewer items
+							<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
+								{projects.map((project, index) => (
+									<motion.div key={project.id} variants={itemVariants}>
+										<ProjectCard project={project} />
+									</motion.div>
+								))}
+							</div>
+						) : (
+							// Show carousel for more than 3 items
+							<Carousel
+								slides={projects.map((project) => (
+									<ProjectCard key={project.id} project={project} />
+								))}
+								options={{ loop: true, align: 'start' }}
+								className="w-full max-w-7xl mx-auto"
+								showDots={true}
+								showArrows={true}
+								autoplay={true}
+								autoplayDelay={5000}
+								itemsPerView={{
+									mobile: 1,
+									tablet: 2,
+									desktop: 3
+								}}
+							/>
+						)}
 					</motion.div>
 				)}
 			</div>
